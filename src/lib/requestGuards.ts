@@ -31,3 +31,12 @@ export function rejectCrossOrigin(request: Request): Response | null {
 export function isHoneypotFilled(value: unknown): boolean {
     return typeof value === "string" && value.trim() !== "";
 }
+
+/** Parses a JSON body, returning undefined when it is missing or malformed. */
+export async function readJsonBody(request: Request): Promise<unknown> {
+    try {
+        return await request.json();
+    } catch {
+        return undefined;
+    }
+}

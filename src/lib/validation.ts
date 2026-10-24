@@ -47,3 +47,7 @@ export function isWithinLength(value: string, max: number): boolean {
 export function firstName(fullName: string): string {
     return fullName.trim().split(/\s+/)[0] ?? fullName;
 }
+
+export function escapeRegex(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
