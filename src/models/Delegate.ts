@@ -19,6 +19,7 @@ export interface IDelegate {
     assignedCommittee?: string | null;
     assignedPortfolio?: string | null;
     delegateStatus: "Active" | "Waitlisted";
+    isHead?: boolean;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -45,6 +46,7 @@ const delegateSchema = new Schema<IDelegate>(
             default: "Active",
             required: true,
         },
+        isHead: { type: Boolean, default: false },
     },
     { timestamps: true },
 );

@@ -15,6 +15,11 @@ export interface IApplication {
     participantType: (typeof PARTICIPANT_TYPES)[number];
     institution?: string;
     status: (typeof APPLICATION_STATUSES)[number];
+    contactName?: string;
+    contactEmail?: string;
+    contactWhatsapp?: string;
+    headIsDelegate?: boolean;
+    idempotencyKey?: string;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -36,6 +41,11 @@ const applicationSchema = new Schema<IApplication>(
             default: "Submitted",
             required: true,
         },
+        contactName: { type: String, trim: true },
+        contactEmail: { type: String, lowercase: true, trim: true },
+        contactWhatsapp: { type: String, trim: true },
+        headIsDelegate: { type: Boolean },
+        idempotencyKey: { type: String, trim: true },
     },
     { timestamps: true },
 );

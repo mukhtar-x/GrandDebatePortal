@@ -1,5 +1,14 @@
 import mongoose, { Schema } from "mongoose";
 
+export interface IReceiptHistoryEntry {
+    receiptUrl: string;
+    receiptFileId?: string;
+    receiptSha256?: string;
+    transactionId?: string;
+    reviewReason?: string;
+    replacedAt: Date;
+}
+
 export interface IPayment {
     applicationId: string;
     totalPayable: number;
@@ -9,6 +18,13 @@ export interface IPayment {
     paymentStatus: "Pending" | "Confirmed" | "Action Required";
     reviewReason?: string;
     reviewedAt?: Date;
+    reviewedBy?: string;
+    receiptFileId?: string;
+    receiptMime?: string;
+    receiptSha256?: string;
+    receiptDhash?: string | null;
+    receiptEditingSoftware?: string | null;
+    receiptHistory?: IReceiptHistoryEntry[];
     createdAt: Date;
     updatedAt: Date;
 }
@@ -28,6 +44,26 @@ const paymentSchema = new Schema<IPayment>(
         },
         reviewReason: { type: String, trim: true },
         reviewedAt: { type: Date },
+        reviewedBy: { type: String, trim: true },
+        receiptFileId: { type: String },
+        receiptMime: { type: String },
+        receiptSha256: { type: String },
+        receiptDhash: { type: String, default: null },
+        receiptEditingSoftware: { type: String, default: null },
+        receiptHistory: {
+            type: [
+                {
+                    _id: false,
+                    receiptUrl: { type: String, required: true },
+                    receiptFileId: { type: String },
+                    receiptSha256: { type: String },
+                    transactionId: { type: String },
+                    reviewReason: { type: String },
+                    replacedAt: { type: Date, required: true },
+                },
+            ],
+            default: undefined,
+        },
     },
     { timestamps: true },
 );
