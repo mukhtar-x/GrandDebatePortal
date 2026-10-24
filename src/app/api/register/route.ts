@@ -1,6 +1,8 @@
 import { getCommitteeOptions } from "@/lib/committeeOptions";
 import { generateApplicationId } from "@/lib/idGenerator";
 import { calculatePricing } from "@/lib/pricing";
+import { consumeRateLimit, rateLimitedResponse } from "@/lib/rateLimit";
+import { getClientIp, rejectCrossOrigin } from "@/lib/requestGuards";
 import { withTransaction } from "@/lib/transaction";
 import Application from "@/models/Application";
 import Delegate, { EXPERIENCE_LEVELS, type IDelegate } from "@/models/Delegate";
@@ -176,6 +178,12 @@ function parseRegistration(body: unknown, activeCodes: Set<string>): ParseResult
 }
 
 export async function POST(request: Request): Promise<Response> {
+    const crossOrigin = rejectCrossOrigin(request);
+    if (crossOrigin) return crossOrigin;
+
+    const limit = await consumeRateLimit(`register:${getClientIp(request)}`, 5, 60 * 60 * 1000);
+    if (!limit.allowed) return rateLimitedResponse(limit.retryAfterSeconds);
+
     let body: unknown;
     try {
         body = await request.json();

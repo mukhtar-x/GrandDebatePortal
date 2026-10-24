@@ -1,4 +1,6 @@
 import connectDB from "@/lib/db";
+import { consumeRateLimit, rateLimitedResponse } from "@/lib/rateLimit";
+import { getClientIp, rejectCrossOrigin } from "@/lib/requestGuards";
 import Delegate from "@/models/Delegate";
 
 interface StatusLookupResult {
@@ -25,6 +27,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+    const crossOrigin = rejectCrossOrigin(request);
+    if (crossOrigin) return crossOrigin;
+
+    const limit = await consumeRateLimit(`status:${getClientIp(request)}`, 10, 60 * 60 * 1000);
+    if (!limit.allowed) return rateLimitedResponse(limit.retryAfterSeconds);
+
     let body: unknown;
     try {
         body = await request.json();
