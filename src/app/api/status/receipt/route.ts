@@ -1,4 +1,6 @@
+import { after } from "next/server";
 import { NOT_FOUND_MESSAGE, buildPortalStatus, findPortalAccess, parsePortalCredentials } from "@/lib/portal";
+import { analyzeReceiptSafely } from "@/lib/receipts/analyze";
 import { consumeRateLimit, rateLimitedResponse } from "@/lib/rateLimit";
 import { deleteReceipt, putReceipt, receiptUrlFor } from "@/lib/receipts/store";
 import { MAX_RECEIPT_BYTES, processReceipt } from "@/lib/receipts/validate";
@@ -167,6 +169,7 @@ export async function POST(request: Request): Promise<Response> {
         );
     }
 
+    after(() => analyzeReceiptSafely(applicationId));
     const updated = await findPortalAccess(credentials.email, credentials.applicationId).catch(() => null);
     return Response.json(updated ? await buildPortalStatus(updated) : { success: true });
 }

@@ -1,8 +1,10 @@
+import { after } from "next/server";
 import { getCommitteeOptions } from "@/lib/committeeOptions";
 import connectDB from "@/lib/db";
 import { generateApplicationId } from "@/lib/idGenerator";
 import { calculatePricing, type Pricing } from "@/lib/pricing";
 import { consumeRateLimit, rateLimitedResponse } from "@/lib/rateLimit";
+import { analyzeReceiptSafely } from "@/lib/receipts/analyze";
 import { deleteReceipt, putReceipt, receiptUrlFor } from "@/lib/receipts/store";
 import { MAX_RECEIPT_BYTES, processReceipt } from "@/lib/receipts/validate";
 import { getClientIp, isHoneypotFilled, rejectCrossOrigin } from "@/lib/requestGuards";
@@ -413,6 +415,8 @@ export async function POST(request: Request): Promise<Response> {
             );
         });
 
+        // OCR and duplicate checks run after the response so the applicant is not kept waiting.
+        after(() => analyzeReceiptSafely(applicationId));
         return successResponse(applicationId, registration.contact.name, pricingResult.pricing);
     } catch (error) {
         await deleteReceipt(receiptFileId);

@@ -54,6 +54,14 @@ export async function deleteReceipt(fileId: string): Promise<void> {
     }
 }
 
+export async function readReceiptBuffer(fileId: string): Promise<Buffer | null> {
+    const receipt = await openReceipt(fileId);
+    if (!receipt) return null;
+    const chunks: Buffer[] = [];
+    for await (const chunk of receipt.stream) chunks.push(chunk as Buffer);
+    return Buffer.concat(chunks);
+}
+
 export async function openReceipt(
     fileId: string,
 ): Promise<{ stream: Readable; mime: string; length: number } | null> {

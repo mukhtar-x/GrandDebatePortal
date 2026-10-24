@@ -9,6 +9,33 @@ export interface IReceiptHistoryEntry {
     replacedAt: Date;
 }
 
+export interface IReceiptFlag {
+    code: string;
+    severity: "low" | "medium" | "high";
+    detail: string;
+}
+
+export interface IReceiptAnalysis {
+    status: "pending" | "done" | "failed";
+    provider: string;
+    receiptSha256?: string;
+    extracted?: {
+        amount?: number | null;
+        date?: string | null;
+        transactionId?: string | null;
+        recipientAccount?: string | null;
+        recipientName?: string | null;
+        channel?: string | null;
+    };
+    flags: IReceiptFlag[];
+    riskScore: number;
+    riskLevel: "low" | "medium" | "high";
+    textExcerpt?: string;
+    ai?: { verdict?: string; reasons?: string[]; model?: string; error?: string } | null;
+    analyzedAt?: Date;
+    error?: string;
+}
+
 export interface IPayment {
     applicationId: string;
     totalPayable: number;
@@ -25,6 +52,7 @@ export interface IPayment {
     receiptDhash?: string | null;
     receiptEditingSoftware?: string | null;
     receiptHistory?: IReceiptHistoryEntry[];
+    analysis?: IReceiptAnalysis;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -64,6 +92,8 @@ const paymentSchema = new Schema<IPayment>(
             ],
             default: undefined,
         },
+        // Written only by the receipt analyser; shape is IReceiptAnalysis.
+        analysis: { type: Schema.Types.Mixed, default: undefined },
     },
     { timestamps: true },
 );

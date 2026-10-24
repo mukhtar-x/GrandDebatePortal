@@ -1,5 +1,7 @@
+import { after } from "next/server";
 import { requireAdmin } from "@/lib/adminAuth";
 import connectDB from "@/lib/db";
+import { analyzeReceiptSafely } from "@/lib/receipts/analyze";
 import { escapeRegex, isOneOf } from "@/lib/validation";
 import Application, { APPLICATION_STATUSES, PARTICIPANT_TYPES } from "@/models/Application";
 import Delegate from "@/models/Delegate";
@@ -7,10 +9,29 @@ import Payment from "@/models/Payment";
 
 const PAGE_SIZE = 50;
 const PAYMENT_STATUSES = ["Pending", "Confirmed", "Action Required"] as const;
+const RISK_LEVELS = ["low", "medium", "high"] as const;
+const CATCH_UP_BATCH = 3;
+const CATCH_UP_AFTER_MS = 2 * 60 * 1000;
 
 /**
- * Query: status, type, paymentStatus, q (searches ID, contact, institution), page (1-based).
- * Newest first.
+ * Background analysis can be cut short on serverless, so opening the admin list re-runs it for a
+ * few receipts that still have no result (or whose result belongs to a replaced receipt).
+ */
+async function catchUpPendingAnalysis(): Promise<void> {
+    const stale = await Payment.find({
+        receiptFileId: { $exists: true },
+        updatedAt: { $lt: new Date(Date.now() - CATCH_UP_AFTER_MS) },
+        $or: [{ analysis: { $exists: false } }, { $expr: { $ne: ["$analysis.receiptSha256", "$receiptSha256"] } }],
+    })
+        .select("applicationId")
+        .limit(CATCH_UP_BATCH)
+        .lean<{ applicationId: string }[]>();
+    for (const { applicationId } of stale) await analyzeReceiptSafely(applicationId);
+}
+
+/**
+ * Query: status, type, paymentStatus, risk (low|medium|high), q (searches ID, contact,
+ * institution), sort=risk (riskiest receipts first; default newest first), page (1-based).
  */
 export async function GET(request: Request): Promise<Response> {
     const auth = requireAdmin(request);
@@ -20,6 +41,8 @@ export async function GET(request: Request): Promise<Response> {
     const status = params.get("status");
     const type = params.get("type");
     const paymentStatus = params.get("paymentStatus");
+    const risk = params.get("risk");
+    const sortByRisk = params.get("sort") === "risk";
     const q = params.get("q")?.trim().slice(0, 100) ?? "";
     const page = Math.max(1, Number.parseInt(params.get("page") ?? "1", 10) || 1);
 
@@ -71,6 +94,8 @@ export async function GET(request: Request): Promise<Response> {
             ...(isOneOf(PAYMENT_STATUSES, paymentStatus)
                 ? [{ $match: { "payment.paymentStatus": paymentStatus } }]
                 : []),
+            ...(isOneOf(RISK_LEVELS, risk) ? [{ $match: { "payment.analysis.riskLevel": risk } }] : []),
+            ...(sortByRisk ? [{ $sort: { "payment.analysis.riskScore": -1 as const, createdAt: -1 as const } }] : []),
             {
                 $lookup: {
                     from: Delegate.collection.name,
@@ -100,6 +125,9 @@ export async function GET(request: Request): Promise<Response> {
             },
         ]);
 
+        after(() =>
+            catchUpPendingAnalysis().catch((error: unknown) => console.error("Analysis catch-up failed:", error)),
+        );
         return Response.json({
             success: true,
             page,

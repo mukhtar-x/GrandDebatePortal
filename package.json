@@ -15,7 +15,9 @@
     "next": "16.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "tesseract.js": "^7.0.0",
+    "unpdf": "^1.9.1"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
