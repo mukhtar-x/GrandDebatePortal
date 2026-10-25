@@ -57,10 +57,9 @@ data and should be re-confirmed with organisers before launch.
 
 ### Not implemented or awaiting organiser confirmation
 
-- **SMTP/email delivery is not working yet.** Email events and message text are wired into the
-  application, but `src/lib/mailer.ts` uses a console-only transport. It logs a
-  `[mail:not-sent]` message and does not deliver email. There are no SMTP environment
-  variables or SMTP dependency configured.
+- Transactional email delivery uses Google SMTP with OAuth2 when the mail environment variables
+  are configured. Delivery failures are logged and do not roll back registration or payment
+  operations; there is not yet a durable retry queue.
 - Payment account title and transfer instructions need organiser approval.
 - Final agendas, committee levels/capacities, and any other event-specific committee details
   need confirmation. A seat count of `0` means unlimited in the admin interface.
@@ -235,6 +234,40 @@ requires `ADMIN_PASSWORD`.
 | `npm start` | Serve the completed build |
 | `npm run seed` | Upsert development committees and demo applications |
 | `npm run test:api` | Run validation checks and available HTTP integration checks |
+| `npm run email:smoke` | Send two synthetic registration emails through Google SMTP |
+
+### Transactional email
+
+The app sends registration, receipt, payment-review, allocation, and waitlist updates through Google SMTP using Nodemailer OAuth2. The TLC Workspace account does not allow App Passwords, so the server uses a refresh token authorized by `tlc.khi@nu.edu.pk`. Configure these environment variables locally and in the production deployment:
+
+| Variable | Purpose |
+| --- | --- |
+| `GOOGLE_SMTP_USER` | Google mailbox used to authenticate and send, for example `tlc.khi@nu.edu.pk`. |
+| `GOOGLE_OAUTH_CLIENT_ID` | OAuth client ID from the Google Cloud project. |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | OAuth client secret. Keep this secret. |
+| `GOOGLE_OAUTH_REFRESH_TOKEN` | Refresh token granted by the sending mailbox. Keep this secret. |
+| `GOOGLE_SMTP_HOST` | Optional; defaults to `smtp.gmail.com`. |
+| `GOOGLE_SMTP_PORT` | Optional; `465` (SSL, default) or `587` (STARTTLS). |
+| `GOOGLE_SMTP_FROM` | Optional approved sender alias; defaults to `GOOGLE_SMTP_USER`. |
+| `TGD_SITE_URL` | Public site origin, used to build the application-portal link in emails. |
+
+#### Generating the OAuth credentials
+
+1. In Google Cloud Console, create a project under the `nu.edu.pk` organization and enable the **Gmail API**.
+2. In Google Auth Platform, set the audience to **Internal**. Internal apps are limited to accounts in the Workspace organization. For an External app, publish it to Production; External apps left in Testing can have refresh tokens that expire after 7 days for non-basic scopes. [Google OAuth refresh-token rules](https://developers.google.com/identity/protocols/oauth2).
+3. Create a **Web application** OAuth client and add `https://developers.google.com/oauthplayground` as an authorized redirect URI.
+4. Open [OAuth Playground](https://developers.google.com/oauthplayground), select **Use your own OAuth credentials**, enter the client ID and secret, and use Offline access.
+5. Authorize `https://mail.google.com/` as the sending mailbox, exchange the authorization code for tokens, and save the refresh token in `GOOGLE_OAUTH_REFRESH_TOKEN`.
+
+SMTP XOAUTH2 requires the `https://mail.google.com/` scope. This is a restricted, broad Gmail scope that permits reading, composing, sending, and permanently deleting mail; authorize it only if the mailbox owner and Workspace policy approve that access. If that permission is too broad, use the Gmail API with its narrower `gmail.send` scope instead of SMTP. [Google SMTP OAuth scope](https://developers.google.com/workspace/gmail/imap/xoauth2-protocol), [Gmail API scope descriptions](https://developers.google.com/workspace/gmail/api/auth/scopes).
+
+Keep the client secret and refresh token in `.env.local` and the production secret store only; never commit or paste them into chat. To rotate the client secret, add a new secret in Google Cloud Console, update `GOOGLE_OAUTH_CLIENT_SECRET`, confirm sending works, then disable the old secret. Google can invalidate refresh tokens if the user revokes access, the token is unused for 6 months, or the mailbox password changes when Gmail scopes are granted. OAuth clients inactive for 6 months are also automatically deleted. An `invalid_grant` error requires fresh user consent and a new refresh token. An `EAUTH` SMTP error usually points to incorrect credentials or whitespace in an environment value. [Refresh-token expiration](https://developers.google.com/identity/protocols/oauth2), [OAuth client inactivity](https://support.google.com/cloud/answer/15549257).
+
+Google requires secure TLS for SMTP. Gmail also recommends SPF, DKIM, and DMARC for sender-domain authentication and inbox placement; FAST IT manages those records for the university domain. See [Gmail sender guidelines](https://support.google.com/mail/answer/81126). Workspace SMTP relay (`smtp-relay.gmail.com`) is another option, but it requires FAST IT to configure relay policy and is not the current transport.
+
+Email delivery is scheduled after successful API operations and has finite SMTP timeouts. If SMTP credentials are absent or Google rejects a message, the registration/payment operation still succeeds and the server logs the send failure. The app does not yet keep a durable email retry queue.
+
+Run `npm run email:smoke` locally to send two synthetic confirmation emails through the real mailer: a four-delegate delegation example to `ismailsilat7@gmail.com` and a solo example to `k240546@nu.edu.pk`. It uses clearly marked `TGD-TEST-*` application IDs, does not create MongoDB records, and is disabled when `NODE_ENV=production`. Check each inbox and spam/junk folder, plus the terminal output for delivery status.
 
 `npm run test:api` skips HTTP/database-backed checks when no local API/database is available.
 Some checks read or write the fixed demo records when enabled and a database is reachable.
@@ -264,8 +297,8 @@ Before deployment:
    previously available font cache) may be needed.
 6. Verify admin login, a development registration, status lookup, receipt upload/retrieval,
    payment review, allocation, and CSV export against a non-production deployment.
-7. Configure monitoring, database backups, data retention/access policies, and a real email
-   transport before relying on email notifications.
+7. Configure monitoring, database backups, and data-retention/access policies. Set the Google
+   OAuth SMTP secrets and verify a test delivery before relying on email notifications.
 
 Use `npm start` to run the built app on a Node host. Configure custom domains, TLS, health
 monitoring, and platform-specific runtime limits in the hosting provider. Do not run the seed

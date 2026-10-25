@@ -424,6 +424,8 @@ export async function POST(request: Request): Promise<Response> {
                 type: "registrationReceived",
                 totalPayable: pricingResult.pricing.totalPayable,
                 rateType: pricingResult.pricing.rateType,
+                participantType: registration.participantType,
+                delegateCount: registration.delegates.length,
             }),
         );
         return successResponse(applicationId, registration.contact.name, pricingResult.pricing);

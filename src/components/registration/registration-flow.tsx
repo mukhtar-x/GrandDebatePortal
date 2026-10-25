@@ -169,6 +169,10 @@ export function RegistrationFlow() {
           is confirmed, your committee will be allocated within 1 to 3 business days. You
           may monitor your progress in the portal at any time.
         </p>
+        <p className="confirmation-copy">
+          We'll send an update to the email address on your registration. If it doesn't
+          appear in your inbox, please check your spam or junk folder.
+        </p>
         <div className="application-id-box">
           <span>Your application ID</span>
           <strong>{confirmation.applicationId}</strong>

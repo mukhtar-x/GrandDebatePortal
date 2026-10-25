@@ -1311,7 +1311,7 @@ textarea.form-control {
 
 .portal-lookup-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(275px, 0.75fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: 20px;
 }
@@ -1370,62 +1370,6 @@ textarea.form-control {
   margin: 0;
   font-size: 10px;
   line-height: 1.6;
-}
-
-.portal-aside {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.portal-aside-card > p:not(.section-overline) {
-  margin: 9px 0 0;
-  color: rgba(255, 255, 255, 0.57);
-  font-size: 10px;
-  line-height: 1.7;
-}
-
-.mini-timeline {
-  position: relative;
-  display: flex;
-  justify-content: space-between;
-  margin: 24px 8px 8px;
-}
-
-.mini-timeline-line {
-  position: absolute;
-  top: 50%;
-  right: 11px;
-  left: 11px;
-  height: 1px;
-  background: rgba(229, 204, 179, 0.2);
-}
-
-.mini-timeline-step {
-  position: relative;
-  display: grid;
-  width: 23px;
-  height: 23px;
-  place-items: center;
-  border: 1px solid rgba(229, 204, 179, 0.31);
-  border-radius: 50%;
-  background: #172c53;
-  color: rgba(255, 255, 255, 0.52);
-  font-family: var(--font-display);
-  font-size: 8px;
-}
-
-.mini-timeline-step.is-complete {
-  border-color: var(--grand-gold);
-  background: var(--grand-gold);
-  color: var(--oxford-blue);
-}
-
-.mini-timeline-labels {
-  display: flex;
-  justify-content: space-between;
-  color: rgba(255, 255, 255, 0.43);
-  font-size: 8px;
 }
 
 .demo-samples {
@@ -1997,11 +1941,6 @@ textarea.form-control {
     grid-row: span 2;
   }
 
-  .portal-aside {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .application-status-panel {
     grid-column: 1;
   }
@@ -2111,8 +2050,7 @@ textarea.form-control {
     font-size: 22px;
   }
 
-  .registration-sidebar,
-  .portal-aside {
+  .registration-sidebar {
     display: flex;
   }
 
@@ -2310,12 +2248,7 @@ textarea.form-control {
   display: grid;
   min-height: 450px;
   place-items: center;
-  background-color: var(--oxford-deep);
-  background-image:
-    url("/assets/05_Videos/video_surround_texture.svg"),
-    radial-gradient(ellipse at center, #142a4d 0%, var(--oxford-blue) 48%, var(--oxford-deep) 100%);
-  background-repeat: repeat, no-repeat;
-  background-size: 256px 256px, cover;
+  background: transparent;
 }
 
 .home-reveal {
@@ -2336,11 +2269,6 @@ textarea.form-control {
   overflow: hidden;
   place-items: center;
   background-color: var(--oxford-deep);
-  background-image:
-    url("/assets/05_Videos/video_surround_texture.svg"),
-    radial-gradient(ellipse at center, #142a4d 0%, var(--oxford-blue) 48%, var(--oxford-deep) 100%);
-  background-repeat: repeat, no-repeat;
-  background-size: 256px 256px, cover;
   opacity: 1;
   transition: opacity 650ms ease;
 }
