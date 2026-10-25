@@ -30,6 +30,7 @@ const delegateSchema = new Schema<IDelegate>(
             type: String,
             ref: "Application",
             required: true,
+            trim: true,
         },
         fullName: { type: String, required: true, trim: true },
         email: { type: String, required: true, lowercase: true, trim: true },

@@ -13,6 +13,7 @@ export const DEFAULT_COMMITTEE_OPTIONS: CommitteeOption[] = [
         suitedTo: "All delegates",
         level: "All levels",
         totalSeats: 0,
+        studyGuideUrl: "/docs/committees/unsc-study-guide.pdf",
         active: true,
     },
     {
@@ -22,6 +23,7 @@ export const DEFAULT_COMMITTEE_OPTIONS: CommitteeOption[] = [
         suitedTo: "All delegates",
         level: "All levels",
         totalSeats: 0,
+        studyGuideUrl: "/docs/committees/disec-study-guide.pdf",
         active: true,
     },
     {
@@ -31,6 +33,7 @@ export const DEFAULT_COMMITTEE_OPTIONS: CommitteeOption[] = [
         suitedTo: "All delegates",
         level: "All levels",
         totalSeats: 0,
+        studyGuideUrl: "/docs/committees/sochum-study-guide.pdf",
         active: true,
     },
     {
@@ -40,6 +43,7 @@ export const DEFAULT_COMMITTEE_OPTIONS: CommitteeOption[] = [
         suitedTo: "All delegates",
         level: "All levels",
         totalSeats: 0,
+        studyGuideUrl: "/docs/committees/unwomen-study-guide.pdf",
         active: true,
     },
     {
@@ -49,6 +53,7 @@ export const DEFAULT_COMMITTEE_OPTIONS: CommitteeOption[] = [
         suitedTo: "All delegates",
         level: "All levels",
         totalSeats: 0,
+        studyGuideUrl: "/docs/committees/pna-study-guide.pdf",
         active: true,
     },
 ];

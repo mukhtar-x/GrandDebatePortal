@@ -23,21 +23,62 @@ export function isOneOf<const T extends readonly string[]>(
     return typeof value === "string" && values.includes(value);
 }
 
+/** Strips script/style blocks, HTML tags, and dangerous injections from a string. */
+export function stripHtml(value: string): string {
+    return value
+        .replace(/<\s*(script|style|iframe|object|embed|applet)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, "")
+        .replace(/<\/?[a-zA-Z][^>]*>/gi, "")
+        .replace(/javascript:[^"'\s]*/gi, "")
+        .trim();
+}
+
+/** Sanitizes and auto-trims a string input, stripping any raw HTML or script tags. */
+export function sanitizeString(value: unknown): unknown {
+    if (typeof value !== "string") return value;
+    return stripHtml(value);
+}
+
 export function normalizeString(value: unknown): unknown {
-    return typeof value === "string" ? value.trim() : value;
+    if (typeof value !== "string") return value;
+    return stripHtml(value);
 }
 
 export function normalizeEmail(value: unknown): string | null {
     if (typeof value !== "string") return null;
-    const email = value.trim().toLowerCase();
+    const email = stripHtml(value).toLowerCase();
     return email.length <= MAX_LENGTHS.email && EMAIL_PATTERN.test(email) ? email : null;
 }
 
 /** Returns the number in E.164 format (e.g. +923143552058), defaulting to Pakistan. */
 export function normalizeWhatsapp(value: unknown): string | null {
-    if (typeof value !== "string" || value.trim().length > 32) return null;
-    const phone = parsePhoneNumberFromString(value.trim(), "PK");
+    if (typeof value !== "string") return null;
+    const sanitized = stripHtml(value);
+    if (sanitized.length > 32) return null;
+    const phone = parsePhoneNumberFromString(sanitized, "PK");
     return phone?.isValid() ? phone.number : null;
+}
+
+/**
+ * Recursively sanitizes any input object, array, or primitive:
+ * - Trims leading/trailing whitespace
+ * - Strips raw HTML and script tags
+ * - Preserves original object/array structure
+ */
+export function recursiveSanitize<T>(input: T): T {
+    if (typeof input === "string") {
+        return stripHtml(input) as unknown as T;
+    }
+    if (Array.isArray(input)) {
+        return input.map((item) => recursiveSanitize(item)) as unknown as T;
+    }
+    if (isRecord(input)) {
+        const sanitized: Record<string, unknown> = {};
+        for (const [key, val] of Object.entries(input)) {
+            sanitized[key] = recursiveSanitize(val);
+        }
+        return sanitized as unknown as T;
+    }
+    return input;
 }
 
 export function isWithinLength(value: string, max: number): boolean {

@@ -65,9 +65,14 @@ export default function CommitteesPage() {
                 <dd>To be confirmed</dd>
               </div>
             </dl>
-            <button className="button button-quiet committee-guide-button" type="button" disabled>
-              Study guide · Coming soon
-            </button>
+            <a
+              className="button button-quiet committee-guide-button"
+              href={`/docs/committees/${committee.code === "UN Women" ? "unwomen" : committee.code.toLowerCase()}-study-guide.pdf`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Study guide · PDF <span aria-hidden="true">↓</span>
+            </a>
           </article>
         ))}
       </div>

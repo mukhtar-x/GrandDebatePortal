@@ -26,8 +26,9 @@ The site uses Cinzel and Montserrat from `next/font/google`. Next downloads and 
 | `/` | `app/page.tsx` | Landing page with event identity, date and venue, plus links to registration and application lookup. |
 | `/committees` | `app/(portal)/committees/page.tsx` | Lists the five committees, suitability notes, logo, and pending agenda/level/seat information. |
 | `/register` | `app/(portal)/register/page.tsx` | Displays the event header, event details and interactive solo/delegation registration form. |
-| `/portal` | `app/(portal)/portal/page.tsx` | Looks up a mock application and displays its status. |
-| `/archive` | `app/(portal)/archive/page.tsx` | Shows general-resource and committee folders with empty states until documents are supplied. |
+| `/portal` | `app/(portal)/portal/page.tsx` | Looks up an application by email and application ID, shows its status, and supports requested receipt resubmission. |
+| `/archive` | `app/(portal)/archive/page.tsx` | Lists general event resources and committee folders with the documents currently supplied under `public/docs/`. |
+| `/admin` | `app/admin/page.tsx` | Organiser dashboard for reviewing applications, receipts, payments and committee allocations. |
 
 `(portal)` is a Next.js route group, not part of the URL. Its `layout.tsx` wraps the four inner pages with the shared header, main content region and footer. The root landing page uses the same shared header and footer directly.
 
@@ -97,8 +98,8 @@ The selected receipt is sent with the form to the registration API.
 
 - `data/committee-details.ts` is the single source for committee names, descriptions, logo URLs and image dimensions. It feeds both the committee cards and archive folders.
 - Committee images live in `public/assets/08_Committee_Logos/PNG/`; the home poster and registration header live in `public/assets/07_Posters_and_Headers/`. The header logo and favicon are in `public/assets/01_Logo/`.
-- `app/(portal)/committees/page.tsx` shows the supplied committee descriptions and labels the unconfirmed agendas, levels, seats and study guides as pending.
-- `app/(portal)/archive/page.tsx` lists the planned general resources and committee folders. Download controls remain disabled until document files are available.
+- `app/(portal)/committees/page.tsx` shows committee descriptions and guide links. Committee agendas, levels and seat counts still require organiser confirmation.
+- `app/(portal)/archive/page.tsx` lists general resources and committee documents currently available under `public/docs/`.
 
 ## What is still missing
 
@@ -125,3 +126,11 @@ The selected receipt is sent with the form to the registration API.
 ## API integration boundary
 
 Keep visual components responsible for rendering fields and user feedback. Request/response mapping belongs in `src/lib/api/registration.ts` and `src/lib/api/portal.ts`; `RegistrationFlow` and `PortalLookup` call those service functions. Preserve the page layout and field components when changing API contracts unless the user experience needs to change.
+
+## Admin operations
+
+- `/admin` authenticates through the existing `/api/admin/login` flow and a signed, HttpOnly session cookie. Configure `ADMIN_PASSWORD` with at least eight characters in `.env.local`; the dashboard does not store the secret in browser storage.
+- The dashboard connects to the admin APIs for application search/filtering and roster details, payment confirmation and action requests, secure receipt viewing, receipt reanalysis and batch checks, CSV export, committee edits, allocation, waitlisting and allocation removal.
+- When an organiser marks a payment `Action Required`, the head delegate uploads a corrected screenshot from the applicant status page using `POST /api/status/receipt`. The admin dashboard only requests a correction and reviews the applicant's replacement; organisers do not upload receipts.
+- `npm run seed` runs `scripts/seed.ts`, which upserts the five committee records and two development registrations. It requires `MONGODB_URI` in `.env.local`. Seed application IDs and emails are fixed so reruns update those same records; use only against a development database.
+- `npm run test:api` runs unit-style pricing/normalization checks and, when a local app is reachable, HTTP integration checks. Set `API_BASE_URL` to choose the server. Registration writes are opt-in with `RUN_WRITE_TESTS=1` and should only target a development database.

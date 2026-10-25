@@ -18,6 +18,7 @@ import {
     normalizeEmail,
     normalizeString,
     normalizeWhatsapp,
+    recursiveSanitize,
 } from "@/lib/validation";
 import Application from "@/models/Application";
 import Delegate, { EXPERIENCE_LEVELS, type IDelegate } from "@/models/Delegate";
@@ -270,7 +271,7 @@ export async function POST(request: Request): Promise<Response> {
         formData = await request.formData();
         const payload = formData.get("payload");
         if (typeof payload !== "string") throw new Error("Missing payload");
-        body = JSON.parse(payload);
+        body = recursiveSanitize(JSON.parse(payload));
     } catch {
         return Response.json(
             {

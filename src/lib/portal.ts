@@ -1,5 +1,5 @@
 import connectDB from "@/lib/db";
-import { firstName, isRecord, normalizeEmail } from "@/lib/validation";
+import { firstName, isRecord, normalizeEmail, stripHtml } from "@/lib/validation";
 import Application, { type IApplication } from "@/models/Application";
 import Committee from "@/models/Committee";
 import Delegate, { type IDelegate } from "@/models/Delegate";
@@ -64,7 +64,7 @@ export function parsePortalCredentials(
 ): { email: string; applicationId: string } | null {
     const normalizedEmail = normalizeEmail(email);
     const normalizedId =
-        typeof applicationId === "string" ? applicationId.trim().toUpperCase() : "";
+        typeof applicationId === "string" ? stripHtml(applicationId).toUpperCase() : "";
     if (!normalizedEmail || !normalizedId || normalizedId.length > 40) return null;
     return { email: normalizedEmail, applicationId: normalizedId };
 }

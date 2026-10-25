@@ -59,7 +59,7 @@ export interface IPayment {
 
 const paymentSchema = new Schema<IPayment>(
     {
-        applicationId: { type: String, required: true, unique: true },
+        applicationId: { type: String, required: true, trim: true },
         totalPayable: { type: Number, required: true, min: 0 },
         rateType: { type: String, enum: ["Early bird", "Regular"], required: true },
         receiptUrl: { type: String, required: true, trim: true },
@@ -97,6 +97,8 @@ const paymentSchema = new Schema<IPayment>(
     },
     { timestamps: true },
 );
+
+paymentSchema.index({ applicationId: 1 }, { unique: true });
 
 const Payment = mongoose.models.Payment ?? mongoose.model<IPayment>("Payment", paymentSchema);
 

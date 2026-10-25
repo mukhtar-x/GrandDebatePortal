@@ -7,19 +7,22 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 import { IntroFinishedContext } from "@/components/shared/site-intro-context";
 
 const INTRO_VIDEO = "/assets/05_Videos/tgd_intro_3d_cinematic_720p_muted_for_autoplay.mp4";
 const VIDEO_POSTER = "/assets/05_Videos/video_poster_frame.jpg";
 
 export function SiteIntroProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const [introFinished, setIntroFinished] = useState(false);
   const finishIntro = useCallback(() => setIntroFinished(true), []);
+  const isAdminRoute = pathname === "/admin" || pathname?.startsWith("/admin/");
 
   return (
     <IntroFinishedContext.Provider value={introFinished}>
       {children}
-      <SiteIntro onFinished={finishIntro} />
+      {!isAdminRoute && <SiteIntro onFinished={finishIntro} />}
     </IntroFinishedContext.Provider>
   );
 }

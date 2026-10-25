@@ -31,18 +31,21 @@ export async function GET(request: Request): Promise<Response> {
     const match: Record<string, unknown> = {};
     if (isOneOf(APPLICATION_STATUSES, status)) match.status = status;
     if (isOneOf(PARTICIPANT_TYPES, type)) match.participantType = type;
-    if (q) {
-        const pattern = { $regex: escapeRegex(q), $options: "i" };
-        match.$or = [
-            { applicationId: pattern },
-            { contactEmail: pattern },
-            { contactName: pattern },
-            { institution: pattern },
-        ];
-    }
-
     try {
         await connectDB();
+        if (q) {
+            const pattern = { $regex: escapeRegex(q), $options: "i" };
+            const delegateApplications = await Delegate.distinct("applicationId", {
+                $or: [{ email: pattern }, { fullName: pattern }],
+            });
+            match.$or = [
+                { applicationId: pattern },
+                { contactEmail: pattern },
+                { contactName: pattern },
+                { institution: pattern },
+                ...(delegateApplications.length ? [{ applicationId: { $in: delegateApplications } }] : []),
+            ];
+        }
         const [result] = await Application.aggregate<{ items: unknown[]; total: { count: number }[] }>([
             { $match: match },
             { $sort: { createdAt: -1 } },
@@ -60,6 +63,7 @@ export async function GET(request: Request): Promise<Response> {
                                 totalPayable: 1,
                                 rateType: 1,
                                 transactionId: 1,
+                                receiptFileId: 1,
                                 receiptUrl: 1,
                                 receiptMime: 1,
                                 reviewReason: 1,

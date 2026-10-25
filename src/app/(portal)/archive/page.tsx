@@ -58,16 +58,35 @@ export default function ArchivePage() {
           <span className="archive-count">{GENERAL_RESOURCES.length} resources</span>
         </div>
         <div className="archive-resource-list">
-          {GENERAL_RESOURCES.map((resource, index) => (
-            <div className="archive-resource" key={resource}>
-              <span className="archive-resource-number">0{index + 1}</span>
-              <span className="archive-resource-title">{resource}</span>
-              <span className="archive-coming-soon">Coming soon</span>
-              <button className="button button-quiet" type="button" disabled>
-                Download
-              </button>
-            </div>
-          ))}
+          {GENERAL_RESOURCES.map((resource, index) => {
+            const isRulebook = resource === "Rules of procedure";
+            return (
+              <div className="archive-resource" key={resource}>
+                <span className="archive-resource-number">0{index + 1}</span>
+                <span className="archive-resource-title">{resource}</span>
+                {isRulebook ? (
+                  <>
+                    <span className="archive-coming-soon">PDF available</span>
+                    <a
+                      className="button button-quiet"
+                      href="/docs/event-rulebook.pdf"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Download
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    <span className="archive-coming-soon">Coming soon</span>
+                    <button className="button button-quiet" type="button" disabled>
+                      Download
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
         <ArchiveEmptyState />
       </section>
@@ -83,18 +102,35 @@ export default function ArchivePage() {
           </Link>
         </div>
         <div className="archive-folder-list">
-          {COMMITTEE_DETAILS.map((committee) => (
-            <details className="archive-folder" key={committee.code}>
-              <summary>
-                <span className="archive-folder-name">
-                  <span className="archive-folder-code">{committee.code}</span>
-                  {committee.name}
-                </span>
-                <span className="archive-folder-status">No files yet</span>
-              </summary>
-              <ArchiveEmptyState />
-            </details>
-          ))}
+          {COMMITTEE_DETAILS.map((committee) => {
+            const guideHref = `/docs/committees/${committee.code === "UN Women" ? "unwomen" : committee.code.toLowerCase()}-study-guide.pdf`;
+            return (
+              <details className="archive-folder" key={committee.code}>
+                <summary>
+                  <span className="archive-folder-name">
+                    <span className="archive-folder-code">{committee.code}</span>
+                    {committee.name}
+                  </span>
+                  <span className="archive-folder-status">1 file available</span>
+                </summary>
+                <div className="archive-resource-list" style={{ padding: "1rem" }}>
+                  <div className="archive-resource">
+                    <span className="archive-resource-number">01</span>
+                    <span className="archive-resource-title">{committee.name} · Study Guide</span>
+                    <span className="archive-coming-soon">PDF</span>
+                    <a
+                      className="button button-quiet"
+                      href={guideHref}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Download
+                    </a>
+                  </div>
+                </div>
+              </details>
+            );
+          })}
         </div>
       </section>
     </div>

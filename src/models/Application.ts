@@ -26,7 +26,7 @@ export interface IApplication {
 
 const applicationSchema = new Schema<IApplication>(
     {
-        applicationId: { type: String, required: true, unique: true },
+        applicationId: { type: String, required: true, trim: true },
         participantType: { type: String, enum: PARTICIPANT_TYPES, required: true },
         institution: {
             type: String,
@@ -49,6 +49,8 @@ const applicationSchema = new Schema<IApplication>(
     },
     { timestamps: true },
 );
+
+applicationSchema.index({ applicationId: 1 }, { unique: true });
 
 const Application =
     mongoose.models.Application ??

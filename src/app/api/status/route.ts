@@ -1,6 +1,7 @@
 import { NOT_FOUND_MESSAGE, buildPortalStatus, credentialsFromBody, findPortalAccess } from "@/lib/portal";
 import { consumeRateLimit, rateLimitedResponse } from "@/lib/rateLimit";
 import { getClientIp, rejectCrossOrigin } from "@/lib/requestGuards";
+import { recursiveSanitize } from "@/lib/validation";
 
 export async function POST(request: Request): Promise<Response> {
     const crossOrigin = rejectCrossOrigin(request);
@@ -11,7 +12,7 @@ export async function POST(request: Request): Promise<Response> {
 
     let body: unknown;
     try {
-        body = await request.json();
+        body = recursiveSanitize(await request.json());
     } catch {
         return Response.json({ success: false, error: "Request body must be valid JSON." }, { status: 400 });
     }

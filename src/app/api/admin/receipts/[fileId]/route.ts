@@ -13,13 +13,14 @@ export async function GET(request: Request, ctx: RouteContext<"/api/admin/receip
             return Response.json({ success: false, error: "Receipt not found." }, { status: 404 });
         }
 
-        const isImage = receipt.mime === "image/jpeg";
+        const inlineImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+        const isInlineImage = inlineImageTypes.has(receipt.mime);
+        const isPdf = receipt.mime === "application/pdf";
         return new Response(Readable.toWeb(receipt.stream) as ReadableStream, {
             headers: {
-                "Content-Type": isImage ? "image/jpeg" : receipt.mime === "application/pdf" ? "application/pdf" : "application/octet-stream",
+                "Content-Type": isInlineImage || isPdf ? receipt.mime : "application/octet-stream",
                 "Content-Length": String(receipt.length),
-                // PDFs download rather than render in the site's origin.
-                "Content-Disposition": isImage ? "inline" : "attachment",
+                "Content-Disposition": isInlineImage ? "inline" : "attachment",
                 "Cache-Control": "private, no-store",
                 "X-Content-Type-Options": "nosniff",
                 "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox",
