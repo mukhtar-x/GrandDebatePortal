@@ -8,13 +8,14 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   reactCompiler: true,
-  // Receipt OCR loads its worker script and WASM by path, so it must not be bundled,
-  // and the files must be shipped with the API functions that run it.
+  // Receipt OCR loads its worker script, WASM and English data by path, so it must not be
+  // bundled, and the files must be shipped with the API functions that run it.
   serverExternalPackages: ["tesseract.js"],
   outputFileTracingIncludes: {
     "/api/**": [
       "./node_modules/tesseract.js/src/**/*",
       "./node_modules/tesseract.js-core/*.{js,wasm}",
+      "./node_modules/@tesseract.js-data/eng/4.0.0_best_int/*",
     ],
   },
   turbopack: {

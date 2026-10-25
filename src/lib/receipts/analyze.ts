@@ -111,14 +111,6 @@ function contentFlags(payment: IPayment, parsed: ParsedReceipt, text: string): I
         });
     }
 
-    if (payment.receiptEditingSoftware) {
-        flags.push({
-            code: "EDITING_SOFTWARE",
-            severity: "medium",
-            detail: `The file was saved by ${payment.receiptEditingSoftware}.`,
-        });
-    }
-
     const account = PAYMENT_DETAILS.accountNumber?.replace(/\D/g, "");
     if (readable && account && account.length >= 4) {
         const digits = text.replace(/\D/g, "");
@@ -133,6 +125,13 @@ function contentFlags(payment: IPayment, parsed: ParsedReceipt, text: string): I
         }
     }
     return flags;
+}
+
+/** Checks on the file itself, available without OCR. */
+function fileFlags(payment: IPayment): IReceiptFlag[] {
+    return payment.receiptEditingSoftware
+        ? [{ code: "EDITING_SOFTWARE", severity: "medium", detail: `The file was saved by ${payment.receiptEditingSoftware}.` }]
+        : [];
 }
 
 function aiFlag(ai: AiCheckResult): IReceiptFlag | null {
@@ -150,9 +149,104 @@ function riskLevel(score: number): IReceiptAnalysis["riskLevel"] {
     return score >= 50 ? "high" : score >= 20 ? "medium" : "low";
 }
 
+function scored(flags: IReceiptFlag[]): Pick<IReceiptAnalysis, "flags" | "riskScore" | "riskLevel"> {
+    const riskScore = flags.reduce((total, flag) => total + SEVERITY_SCORE[flag.severity], 0);
+    return { flags, riskScore, riskLevel: riskLevel(riskScore) };
+}
+
+/** Receipts uploaded before this one; the original is never flagged because of a later copy. */
+function earlierPayments(payment: IPayment): Promise<OtherPayment[]> {
+    return Payment.find({ applicationId: { $ne: payment.applicationId }, createdAt: { $lt: receiptUploadedAt(payment) } })
+        .select(
+            "applicationId receiptSha256 receiptDhash transactionId receiptHistory.receiptSha256 analysis.extracted.transactionId analysis.textExcerpt",
+        )
+        .lean<OtherPayment[]>();
+}
+
+async function storeAnalysis(payment: IPayment, analysis: IReceiptAnalysis, filter: Record<string, unknown> = {}) {
+    // Only store the result if the receipt was not replaced while it was being checked.
+    await Payment.updateOne(
+        { applicationId: payment.applicationId, receiptSha256: payment.receiptSha256, ...filter },
+        { $set: { analysis } },
+    );
+    await Application.updateOne(
+        { applicationId: payment.applicationId, status: "Submitted" },
+        { $set: { status: "Payment under review" } },
+    );
+}
+
 /**
- * Reads the current receipt for an application, checks it for duplicates and inconsistencies,
- * and stores the result on the payment for the organisers. Never changes the payment decision.
+ * Instant checks run on upload (no OCR): exact duplicate file, a transaction ID the applicant
+ * typed that was already used, and editing software in the file. Full checks run on demand.
+ */
+export async function quickCheckReceipt(applicationId: string): Promise<IReceiptAnalysis | null> {
+    await connectDB();
+    const payment = await Payment.findOne({ applicationId }).lean<IPayment>();
+    if (!payment?.receiptFileId) return null;
+
+    const noText = parseReceiptText("", payment.totalPayable);
+    const flags = [...duplicateFlags(payment, noText, "", await earlierPayments(payment)), ...fileFlags(payment)];
+    const analysis: IReceiptAnalysis = {
+        status: "quick",
+        provider: "none",
+        receiptSha256: payment.receiptSha256,
+        ...scored(flags),
+        analyzedAt: new Date(),
+    };
+    // Never overwrite a full check of the same receipt.
+    await storeAnalysis(payment, analysis, {
+        $or: [{ analysis: { $exists: false } }, { "analysis.receiptSha256": { $ne: payment.receiptSha256 } }],
+    });
+    return analysis;
+}
+
+export function quickCheckReceiptSafely(applicationId: string): Promise<void> {
+    return quickCheckReceipt(applicationId).then(
+        () => undefined,
+        (error: unknown) => console.error("Quick receipt check failed:", error),
+    );
+}
+
+/** Payments whose current receipt has not had a full (OCR) check yet. */
+const NEEDS_FULL_CHECK = {
+    receiptFileId: { $exists: true },
+    $or: [
+        { analysis: { $exists: false } },
+        { "analysis.status": "quick" },
+        { $expr: { $ne: ["$analysis.receiptSha256", "$receiptSha256"] } },
+    ],
+};
+
+export async function countPendingFullChecks(): Promise<number> {
+    await connectDB();
+    return Payment.countDocuments(NEEDS_FULL_CHECK);
+}
+
+/**
+ * Runs full checks oldest first, so each receipt is compared with the text of earlier ones,
+ * stopping at `limit` receipts or when the time budget is spent.
+ */
+export async function analyzePendingReceipts(limit: number, budgetMs: number) {
+    const startedAt = Date.now();
+    await connectDB();
+    const pending = await Payment.find(NEEDS_FULL_CHECK)
+        .sort({ createdAt: 1 })
+        .select("applicationId")
+        .limit(limit)
+        .lean<{ applicationId: string }[]>();
+
+    const processed: { applicationId: string; status: string; riskLevel: string }[] = [];
+    for (const { applicationId } of pending) {
+        if (Date.now() - startedAt > budgetMs) break;
+        const analysis = await analyzeReceipt(applicationId);
+        if (analysis) processed.push({ applicationId, status: analysis.status, riskLevel: analysis.riskLevel });
+    }
+    return { processed, remaining: await countPendingFullChecks() };
+}
+
+/**
+ * Full check: reads the receipt with OCR, checks it for duplicates and inconsistencies, and
+ * stores the result on the payment for the organisers. Never changes the payment decision.
  */
 export async function analyzeReceipt(applicationId: string): Promise<IReceiptAnalysis | null> {
     await connectDB();
@@ -177,15 +271,11 @@ export async function analyzeReceipt(applicationId: string): Promise<IReceiptAna
         }
 
         const parsed = parseReceiptText(text, payment.totalPayable);
-        // Only receipts uploaded earlier count, so the original is never flagged because of a later copy.
-        const uploadedAt = receiptUploadedAt(payment);
-        const others = await Payment.find({ applicationId: { $ne: applicationId }, createdAt: { $lt: uploadedAt } })
-            .select(
-                "applicationId receiptSha256 receiptDhash transactionId receiptHistory.receiptSha256 analysis.extracted.transactionId analysis.textExcerpt",
-            )
-            .lean<OtherPayment[]>();
-
-        const flags = [...duplicateFlags(payment, parsed, text, others), ...contentFlags(payment, parsed, text)];
+        const flags = [
+            ...duplicateFlags(payment, parsed, text, await earlierPayments(payment)),
+            ...contentFlags(payment, parsed, text),
+            ...fileFlags(payment),
+        ];
 
         let ai: IReceiptAnalysis["ai"] = null;
         if (isAiCheckConfigured()) {
@@ -203,7 +293,6 @@ export async function analyzeReceipt(applicationId: string): Promise<IReceiptAna
             }
         }
 
-        const riskScore = flags.reduce((total, flag) => total + SEVERITY_SCORE[flag.severity], 0);
         analysis = {
             status: "done",
             provider,
@@ -216,9 +305,7 @@ export async function analyzeReceipt(applicationId: string): Promise<IReceiptAna
                 recipientName: parsed.recipientName,
                 channel: parsed.channel,
             },
-            flags,
-            riskScore,
-            riskLevel: riskLevel(riskScore),
+            ...scored(flags),
             textExcerpt: text.slice(0, 3000),
             ai,
             analyzedAt: new Date(),
@@ -238,22 +325,6 @@ export async function analyzeReceipt(applicationId: string): Promise<IReceiptAna
         };
     }
 
-    // Only store the result if the receipt was not replaced while it was being analysed.
-    await Payment.updateOne(
-        { applicationId, receiptSha256: payment.receiptSha256 },
-        { $set: { analysis } },
-    );
-    await Application.updateOne(
-        { applicationId, status: "Submitted" },
-        { $set: { status: "Payment under review" } },
-    );
+    await storeAnalysis(payment, analysis);
     return analysis;
-}
-
-/** Runs analysis in the background, logging instead of throwing. */
-export function analyzeReceiptSafely(applicationId: string): Promise<void> {
-    return analyzeReceipt(applicationId).then(
-        () => undefined,
-        (error: unknown) => console.error("Background receipt analysis failed:", error),
-    );
 }

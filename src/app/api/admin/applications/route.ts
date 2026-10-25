@@ -1,7 +1,6 @@
-import { after } from "next/server";
 import { requireAdmin } from "@/lib/adminAuth";
 import connectDB from "@/lib/db";
-import { analyzeReceiptSafely } from "@/lib/receipts/analyze";
+import { countPendingFullChecks } from "@/lib/receipts/analyze";
 import { escapeRegex, isOneOf } from "@/lib/validation";
 import Application, { APPLICATION_STATUSES, PARTICIPANT_TYPES } from "@/models/Application";
 import Delegate from "@/models/Delegate";
@@ -10,28 +9,11 @@ import Payment from "@/models/Payment";
 const PAGE_SIZE = 50;
 const PAYMENT_STATUSES = ["Pending", "Confirmed", "Action Required"] as const;
 const RISK_LEVELS = ["low", "medium", "high"] as const;
-const CATCH_UP_BATCH = 3;
-const CATCH_UP_AFTER_MS = 2 * 60 * 1000;
-
-/**
- * Background analysis can be cut short on serverless, so opening the admin list re-runs it for a
- * few receipts that still have no result (or whose result belongs to a replaced receipt).
- */
-async function catchUpPendingAnalysis(): Promise<void> {
-    const stale = await Payment.find({
-        receiptFileId: { $exists: true },
-        updatedAt: { $lt: new Date(Date.now() - CATCH_UP_AFTER_MS) },
-        $or: [{ analysis: { $exists: false } }, { $expr: { $ne: ["$analysis.receiptSha256", "$receiptSha256"] } }],
-    })
-        .select("applicationId")
-        .limit(CATCH_UP_BATCH)
-        .lean<{ applicationId: string }[]>();
-    for (const { applicationId } of stale) await analyzeReceiptSafely(applicationId);
-}
 
 /**
  * Query: status, type, paymentStatus, risk (low|medium|high), q (searches ID, contact,
  * institution), sort=risk (riskiest receipts first; default newest first), page (1-based).
+ * `pendingChecks` is how many receipts still need a full (OCR) check.
  */
 export async function GET(request: Request): Promise<Response> {
     const auth = requireAdmin(request);
@@ -125,11 +107,9 @@ export async function GET(request: Request): Promise<Response> {
             },
         ]);
 
-        after(() =>
-            catchUpPendingAnalysis().catch((error: unknown) => console.error("Analysis catch-up failed:", error)),
-        );
         return Response.json({
             success: true,
+            pendingChecks: await countPendingFullChecks(),
             page,
             pageSize: PAGE_SIZE,
             total: result?.total[0]?.count ?? 0,

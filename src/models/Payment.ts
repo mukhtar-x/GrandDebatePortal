@@ -16,7 +16,7 @@ export interface IReceiptFlag {
 }
 
 export interface IReceiptAnalysis {
-    status: "pending" | "done" | "failed";
+    status: "quick" | "done" | "failed";
     provider: string;
     receiptSha256?: string;
     extracted?: {
