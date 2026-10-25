@@ -1,0 +1,15 @@
+THE GRAND DEBATE '26 COLOURS
+
+MAIN
+  Oxford Blue    #0D1E3B   main background of the site
+  Dark Beige     #C5A28C   main secondary colour
+
+SIDE
+  Space Cadet    #203565   cards, panels, sections on top of oxford blue
+  Grand Gold     #C9A055   the logo's gold: headings, thin lines, buttons, icons
+  Desert Sand    #E5CCB3   light sections / alternate backgrounds
+  White          #FFFFFF   body text on oxford blue
+  Black          #000000   body text on light (beige / sand / white) sections
+
+Good pairs: white or gold text on oxford blue; oxford blue or black text on desert sand / white.
+Avoid: gold text on white or sand (too faint to read).

@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import { HeroLogoReveal } from "@/components/shared/hero-logo-reveal";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { SiteHeader } from "@/components/shared/site-header";
 import { EVENT_DETAILS } from "@/data/event";
@@ -43,14 +43,7 @@ export default function Home() {
           </div>
 
           <div className="home-art" aria-hidden="true">
-            <Image
-              className="home-poster"
-              src="/brand/event-poster.jpg"
-              alt=""
-              width={1200}
-              height={1200}
-              priority
-            />
+            <HeroLogoReveal />
           </div>
         </section>
 

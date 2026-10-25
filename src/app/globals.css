@@ -36,9 +36,6 @@ body {
   min-height: 100vh;
   margin: 0;
   background-color: var(--oxford-blue);
-  background-image: url("/textures/oxford-grain.webp");
-  background-repeat: repeat;
-  background-size: 128px 128px;
   color: var(--white);
   font-family: var(--font-body);
   font-size: 15px;
@@ -2313,16 +2310,97 @@ textarea.form-control {
   display: grid;
   min-height: 450px;
   place-items: center;
-  background: radial-gradient(ellipse 62% 54% at center, var(--navy-glow), transparent 72%);
+  background-color: var(--oxford-deep);
+  background-image:
+    url("/assets/05_Videos/video_surround_texture.svg"),
+    radial-gradient(ellipse at center, #142a4d 0%, var(--oxford-blue) 48%, var(--oxford-deep) 100%);
+  background-repeat: repeat, no-repeat;
+  background-size: 256px 256px, cover;
 }
 
-.home-poster {
-  width: min(100%, 440px);
-  height: auto;
+.home-reveal {
+  display: block;
+  width: min(100%, 620px);
+  aspect-ratio: 16 / 9;
   border: 1px solid rgba(201, 160, 85, 0.52);
-  border-radius: 4px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.3), 0 0 40px rgba(32, 53, 101, 0.35);
   object-fit: cover;
+}
+
+.site-intro {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  overflow: hidden;
+  place-items: center;
+  background-color: var(--oxford-deep);
+  background-image:
+    url("/assets/05_Videos/video_surround_texture.svg"),
+    radial-gradient(ellipse at center, #142a4d 0%, var(--oxford-blue) 48%, var(--oxford-deep) 100%);
+  background-repeat: repeat, no-repeat;
+  background-size: 256px 256px, cover;
+  opacity: 1;
+  transition: opacity 650ms ease;
+}
+
+.site-intro.is-leaving {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.site-intro-video,
+.site-intro-vignette {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+}
+
+.site-intro-video {
+  object-fit: cover;
+}
+
+.site-intro-vignette {
+  background:
+    linear-gradient(180deg, rgba(4, 12, 27, 0.26), transparent 24%, transparent 74%, rgba(4, 12, 27, 0.3)),
+    radial-gradient(ellipse at center, transparent 48%, rgba(4, 12, 27, 0.32));
+  pointer-events: none;
+}
+
+.site-intro-skip {
+  position: absolute;
+  z-index: 1;
+  right: clamp(18px, 4vw, 48px);
+  bottom: clamp(18px, 4vw, 40px);
+  padding: 10px 15px;
+  border: 1px solid rgba(229, 204, 179, 0.46);
+  border-radius: 999px;
+  background: rgba(8, 21, 45, 0.58);
+  color: var(--desert-sand);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  backdrop-filter: blur(10px);
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.site-intro-skip:hover {
+  border-color: var(--grand-gold);
+  background: rgba(8, 21, 45, 0.86);
+}
+
+.site-intro-skip span {
+  margin-left: 7px;
+  color: var(--grand-gold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-intro {
+    display: none;
+  }
 }
 
 .home-next-steps {
@@ -2451,12 +2529,27 @@ textarea.form-control {
   }
 
   .home-art {
-    min-height: 300px;
+    min-height: 0;
+    aspect-ratio: 16 / 9;
     margin-top: 8px;
   }
 
-  .home-poster {
-    width: min(82%, 280px);
+  .home-reveal {
+    width: 100%;
+    height: 100%;
+  }
+
+  .site-intro-video {
+    width: min(100vw, 177.78svh);
+    height: auto;
+    max-height: 100svh;
+    object-fit: contain;
+  }
+
+  .site-intro-vignette {
+    background:
+      linear-gradient(180deg, rgba(4, 12, 27, 0.16), transparent 20%, transparent 80%, rgba(4, 12, 27, 0.22)),
+      radial-gradient(ellipse at center, transparent 38%, rgba(4, 12, 27, 0.24));
   }
 
   .home-next-steps {

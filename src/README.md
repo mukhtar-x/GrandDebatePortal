@@ -1,12 +1,12 @@
 # The Grand Debate '26 Frontend
 
-This guide describes the frontend under `src/`: how the routes, shared components, page-specific components, static data and public assets fit together; what is currently mocked; and what still needs to be supplied or connected.
+This guide describes the frontend under `src/`: how the routes, shared components, page-specific components, static data and public assets fit together, and what still needs to be supplied.
 
 ## Stack and local commands
 
 - Next.js App Router, React and TypeScript.
 - Tailwind CSS v4 is available, with the event's main styling defined in `app/globals.css`.
-- No API calls are made by these frontend screens. Registration and portal data are mock-only.
+- Registration, application lookup and receipt resubmission use the app's API routes through `src/lib/api/`.
 - No additional packages were added for the frontend.
 
 Run commands from the project root, one level above `src/`:
@@ -46,26 +46,33 @@ flowchart TD
   Register --> Flow[RegistrationFlow]
   Flow --> Fields[Registration field components]
   Flow --> EventData[data/event.ts]
-  Flow --> MockSave[saveMockRegistration]
+  Flow --> RegistrationAPI[lib/api/registration.ts]
+  RegistrationAPI --> RegisterRoute[POST /api/register]
   Portal --> Lookup[PortalLookup]
-  Lookup --> MockFind[findMockApplication]
-  MockSave --> Session[sessionStorage for this browser tab]
-  MockFind --> Session
-  MockFind --> Samples[DEMO_APPLICATIONS]
+  Lookup --> PortalAPI[lib/api/portal.ts]
+  PortalAPI --> StatusRoute[POST /api/status]
+  PortalAPI --> ReceiptRoute[POST /api/status/receipt]
   Committees --> CommitteeData[data/committee-details.ts]
   Archive --> CommitteeData
-  CommitteeData --> Images[public/committee-logos]
+  CommitteeData --> Images[public/assets/08_Committee_Logos/PNG]
 ```
 
 ### Shared shell and visual system
 
 - `app/layout.tsx` loads Cinzel and Montserrat, sets the site metadata and imports `app/globals.css`.
 - `app/globals.css` defines the Oxford Blue, Space Cadet, Grand Gold, Dark Beige and Desert Sand tokens; typography; shared controls; page layouts; breakpoints; focus states; and reduced-motion behavior.
-- `components/shared/site-header.tsx` contains the desktop and mobile navigation. On mobile it uses a native `<details>` menu, tracks the open state, highlights the current route and closes the menu after a navigation link is selected.
+- `components/shared/site-header.tsx` is a Server Component for the static brand shell. `components/shared/site-navigation.tsx` is the small client island for the current-route highlight; its native `<details>` menu owns its open state without mirrored React state.
 - `components/shared/site-footer.tsx` contains the event organizer and supplied contact/social links.
+- `components/shared/site-intro.tsx` plays the cinematic entrance once on a full page load; `components/shared/hero-logo-reveal.tsx` loads the home-only reveal after the intro completes. Both are muted, have no player controls and respect reduced-motion preferences. The hero uses a lossless fast-start 1080p video on desktop and a high-quality 720p encode on mobile. Its still frame comes from the supplied poster, while the letterbox surround uses a seamless navy grain texture.
 - `components/ui/form-fields.tsx` provides reusable labelled input, select and textarea components used by the form and lookup UI.
 
 Keep common colors, controls and spacing in the shared stylesheet/components so new pages stay visually consistent.
+
+### Client boundaries and rendering performance
+
+- Route pages, shared header/footer shell, archive, committee cards, and reusable form-field components remain Server Components. Client boundaries are limited to the header navigation, intro sequence, home-only reveal, registration flow, and application lookup/resubmission.
+- `reactCompiler: true` is enabled in `next.config.ts`. It automatically memoizes safe component calculations, callbacks, and rendering. Do not add `useMemo`, `useCallback`, or `memo` for cheap values without measured evidence; keep explicit callback hooks only where an effect depends on a stable identity.
+- The global intro and home-only reveal are separate modules, so reveal-specific playback logic is not part of other route components.
 
 ### Registration flow
 
@@ -78,25 +85,18 @@ Keep common colors, controls and spacing in the shared stylesheet/components so 
 - `CommitteePreferences` for first and second preferences, using the committee list in `data/event.ts`.
 - `PaymentSection` for the calculated total, receipt file picker and optional transaction ID.
 
-`components/registration/types.ts` defines the form value shapes. Submission currently uses browser validation, creates a demo application with `saveMockRegistration`, and shows a confirmation with a generated demo ID. The confirmation links to `/portal`.
+`components/registration/types.ts` defines the form value shapes. Submission uses browser validation, sends the form and receipt to `POST /api/register`, and shows the returned application ID on success. The confirmation links to `/portal`.
 
-The selected receipt file is currently used only to display its filename. The file contents and the rest of the form are not uploaded or persisted by the mock. The mock record stores only the application ID, email, first name, registration type and delegate names.
+The selected receipt is sent with the form to the registration API.
 
 ### Application lookup
 
-`app/(portal)/portal/page.tsx` renders `components/portal/portal-lookup.tsx`. The lookup accepts email plus application ID, then calls `findMockApplication` in `data/portal-mocks.ts`.
-
-The mock lookup checks both:
-
-1. Registrations stored in this browser tab's `sessionStorage` by the mock registration flow.
-2. A small set of hard-coded demo records covering review, confirmed, allocated, action-required and waitlisted states.
-
-Demo buttons load sample records for preview. The receipt re-upload action and status changes are visual simulations; they do not reach an organiser or persist to a backend.
+`app/(portal)/portal/page.tsx` renders `components/portal/portal-lookup.tsx`. The lookup submits the email and application ID to `POST /api/status`; receipt resubmission uses `POST /api/status/receipt`.
 
 ### Committees and archive
 
 - `data/committee-details.ts` is the single source for committee names, descriptions, logo URLs and image dimensions. It feeds both the committee cards and archive folders.
-- The images live in `public/committee-logos/`; the event poster and registration header live in `public/brand/`.
+- Committee images live in `public/assets/08_Committee_Logos/PNG/`; the home poster and registration header live in `public/assets/07_Posters_and_Headers/`. The header logo and favicon are in `public/assets/01_Logo/`.
 - `app/(portal)/committees/page.tsx` shows the supplied committee descriptions and labels the unconfirmed agendas, levels, seats and study guides as pending.
 - `app/(portal)/archive/page.tsx` lists the planned general resources and committee folders. Download controls remain disabled until document files are available.
 
@@ -104,12 +104,12 @@ Demo buttons load sample records for preview. The receipt re-upload action and s
 
 | Area | Current state | Needed to finish it |
 | --- | --- | --- |
-| Frontend-to-backend integration | Not connected, as planned for the backend teammate. | API endpoint contracts, request/response types, error behavior and agreed authentication/session handling. Add a separate API/service layer, then replace the mock calls without putting network code inside presentational field components. |
+| Frontend-to-backend integration | Registration, lookup and receipt resubmission are connected to API routes. | Validate the API integration against the production database and deployment configuration. |
 | Payment instructions | The form warns that account details are being confirmed. | Confirmed account title, bank or payment provider, account number and approved wording. Do not publish unverified payment details. |
-| Receipt handling | Browser file picker only; filename is shown. No upload, persistence or configured maximum size. | Backend upload endpoint, accepted file types and size limit, upload progress/error responses, and retention rules. |
+| Receipt handling | Registration uploads the receipt through the API; the server validates and analyzes it before storage. The portal supports resubmission when action is required. | Confirm operational retention rules and monitor storage/processing in the deployed environment. |
 | Committee details | Five logos and suitability descriptions are present. Agenda, difficulty level and seat count are marked pending. Study-guide buttons are disabled. | Final agendas, levels, seat counts and each approved guide/link. |
 | Archive | General-resource labels and committee folders are present, but there are no downloadable documents. | The PDFs/files, final titles, short descriptions, sizes and last-updated dates. Enable downloads only for available files. |
-| Portal status | Demo records and local registrations only. Action-required receipt upload is simulated. | Backend lookup/status contract, authoritative status messages, delegation data, allocation fields and receipt resubmission endpoint. |
+| Portal status | Lookup and action-required receipt resubmission use API routes and application data. | Verify production configuration and end-to-end status behavior after deployment. |
 | Landing page | Includes the event identity, date/venue and entry links. | The content brief also calls for a countdown, registration-window banner, About section, key-detail cards, sponsor section, committee teaser, how-it-works steps and FAQ accordion. Sponsor content is explicitly pending; the other sections still need to be built if the landing page must match the full brief. |
 | Production event data | Event dates, fees, contacts and registration-window cutoffs are static frontend data. | Confirm these values before launch and update `data/event.ts` if any change. Registration-window logic uses the `Asia/Karachi` timezone. |
 
@@ -117,13 +117,11 @@ Demo buttons load sample records for preview. The receipt re-upload action and s
 
 - Most route pages are Server Components. Client-side JavaScript is limited to interactive areas such as the header menu, registration form and lookup.
 - Keep committee and event copy in data modules rather than duplicating it across routes.
-- Use `next/image` for the logo, committee marks, poster and registration banner so image delivery can be optimized by Next.js. Avoid loading the same image as both a CSS background and an `<Image>`.
+- Use `next/image` for static images and muted, controls-free video elements for the cinematic intro and home hero reveal.
 - Prefer CSS and native browser controls over adding a dependency for a small interaction. The mobile menu uses native `<details>` behavior and closes after link selection.
 - Preserve the existing breakpoints, keyboard focus styles and reduced-motion rules in `globals.css` when adding components.
 - Keep large new work out of client components unless it needs browser state or event handling. This helps keep initial page JavaScript small.
 
-## Future API integration boundary
+## API integration boundary
 
-When the backend is ready, keep the visual components responsible for rendering fields and user feedback. Put request/response mapping in a service module (for example, `src/lib/api/registration.ts` and `src/lib/api/portal.ts`) and have `RegistrationFlow` and `PortalLookup` call those functions. Replace `saveMockRegistration` and `findMockApplication` at that boundary. Preserve the page layout and field components unless the API contract requires a visible change.
-
-The current mock modules are safe to remove only after both flows use the agreed backend service and the demo behavior is no longer needed.
+Keep visual components responsible for rendering fields and user feedback. Request/response mapping belongs in `src/lib/api/registration.ts` and `src/lib/api/portal.ts`; `RegistrationFlow` and `PortalLookup` call those service functions. Preserve the page layout and field components when changing API contracts unless the user experience needs to change.

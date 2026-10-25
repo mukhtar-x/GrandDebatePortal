@@ -13,7 +13,7 @@ export default function RegisterPage() {
     <div className="page-container">
       <div className="registration-brand-banner">
         <Image
-          src="/brand/registration-header.png"
+          src="/assets/07_Posters_and_Headers/tgd_google_forms_header_1600x400.png"
           alt="The Grand Debate '26"
           width={1600}
           height={400}
