@@ -1,4 +1,6 @@
+import { after } from "next/server";
 import { requireAdminMutation } from "@/lib/adminAuth";
+import { notifyContact } from "@/lib/mailer";
 import { withTransaction } from "@/lib/transaction";
 import Application from "@/models/Application";
 import Payment from "@/models/Payment";
@@ -33,6 +35,7 @@ export async function POST(
                 { session },
             );
         });
+        after(() => notifyContact(applicationId, { type: "paymentConfirmed" }));
         return Response.json({ success: true, applicationId, paymentStatus: "Confirmed" });
     } catch (error) {
         if (error instanceof NotFoundError) {

@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
+import { after } from "next/server";
 import { requireAdminMutation } from "@/lib/adminAuth";
 import { syncApplicationStatus } from "@/lib/allocation";
+import { notifyDelegate } from "@/lib/mailer";
 import { withTransaction } from "@/lib/transaction";
 import Delegate from "@/models/Delegate";
 import Payment from "@/models/Payment";
@@ -46,6 +48,7 @@ export async function POST(
             await delegate.save({ session });
             await syncApplicationStatus(delegate.applicationId, session);
         });
+        after(() => notifyDelegate(id, { type: "waitlisted" }));
         return Response.json({ success: true, delegateStatus: "Waitlisted" });
     } catch (error) {
         if (error instanceof WaitlistError) {

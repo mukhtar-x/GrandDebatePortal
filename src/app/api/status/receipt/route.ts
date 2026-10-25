@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import { notifyContact } from "@/lib/mailer";
 import { NOT_FOUND_MESSAGE, buildPortalStatus, findPortalAccess, parsePortalCredentials } from "@/lib/portal";
 import { quickCheckReceiptSafely } from "@/lib/receipts/analyze";
 import { consumeRateLimit, rateLimitedResponse } from "@/lib/rateLimit";
@@ -170,6 +171,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     after(() => quickCheckReceiptSafely(applicationId));
+    after(() => notifyContact(applicationId, { type: "receiptResubmitted" }));
     const updated = await findPortalAccess(credentials.email, credentials.applicationId).catch(() => null);
     return Response.json(updated ? await buildPortalStatus(updated) : { success: true });
 }

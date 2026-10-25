@@ -2,6 +2,7 @@ import { after } from "next/server";
 import { getCommitteeOptions } from "@/lib/committeeOptions";
 import connectDB from "@/lib/db";
 import { generateApplicationId } from "@/lib/idGenerator";
+import { notifyContact } from "@/lib/mailer";
 import { calculatePricing, type Pricing } from "@/lib/pricing";
 import { consumeRateLimit, rateLimitedResponse } from "@/lib/rateLimit";
 import { quickCheckReceiptSafely } from "@/lib/receipts/analyze";
@@ -417,6 +418,13 @@ export async function POST(request: Request): Promise<Response> {
 
         // Instant duplicate checks; the slower OCR check is run by organisers from the admin panel.
         after(() => quickCheckReceiptSafely(applicationId));
+        after(() =>
+            notifyContact(applicationId, {
+                type: "registrationReceived",
+                totalPayable: pricingResult.pricing.totalPayable,
+                rateType: pricingResult.pricing.rateType,
+            }),
+        );
         return successResponse(applicationId, registration.contact.name, pricingResult.pricing);
     } catch (error) {
         await deleteReceipt(receiptFileId);

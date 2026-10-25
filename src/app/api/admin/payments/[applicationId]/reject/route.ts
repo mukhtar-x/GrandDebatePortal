@@ -1,4 +1,6 @@
+import { after } from "next/server";
 import { requireAdminMutation } from "@/lib/adminAuth";
+import { notifyContact } from "@/lib/mailer";
 import { readJsonBody } from "@/lib/requestGuards";
 import { withTransaction } from "@/lib/transaction";
 import { MAX_LENGTHS, isRecord, normalizeString } from "@/lib/validation";
@@ -53,6 +55,7 @@ export async function POST(
 
             await Application.updateOne({ applicationId }, { $set: { status: "Action Required" } }, { session });
         });
+        after(() => notifyContact(applicationId, { type: "actionRequired", reason }));
         return Response.json({ success: true, applicationId, paymentStatus: "Action Required" });
     } catch (error) {
         if (error instanceof NotFoundError) {

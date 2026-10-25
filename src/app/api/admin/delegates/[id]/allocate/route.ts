@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
+import { after } from "next/server";
 import { requireAdminMutation } from "@/lib/adminAuth";
 import { canonicalCommittee, syncApplicationStatus } from "@/lib/allocation";
+import { notifyDelegate } from "@/lib/mailer";
 import { readJsonBody } from "@/lib/requestGuards";
 import { withTransaction } from "@/lib/transaction";
 import { MAX_LENGTHS, escapeRegex, isRecord, normalizeString } from "@/lib/validation";
@@ -93,6 +95,13 @@ export async function POST(
             return current;
         });
 
+        after(() =>
+            notifyDelegate(String(delegate._id), {
+                type: "committeeAllocated",
+                committee: committee.code,
+                portfolio,
+            }),
+        );
         return Response.json({
             success: true,
             delegateId: delegate._id,
