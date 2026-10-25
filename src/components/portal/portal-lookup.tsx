@@ -3,39 +3,12 @@
 import { useState, type FormEvent } from "react";
 import { InputField } from "@/components/ui/form-fields";
 import {
-  DEMO_APPLICATIONS,
-  findMockApplication,
+  lookupApplication,
+  resubmitReceipt,
   type ApplicationStatus,
+  type DelegateRow,
   type PortalApplication,
-} from "@/data/portal-mocks";
-
-const demoCases = [
-  {
-    application: DEMO_APPLICATIONS[0],
-    title: "Payment under review",
-    note: "Solo delegate",
-  },
-  {
-    application: DEMO_APPLICATIONS[1],
-    title: "Committee allocated",
-    note: "Delegation",
-  },
-  {
-    application: DEMO_APPLICATIONS[5],
-    title: "Payment confirmed",
-    note: "Committee allocation in progress",
-  },
-  {
-    application: DEMO_APPLICATIONS[2],
-    title: "Action required",
-    note: "Upload a clearer receipt",
-  },
-  {
-    application: DEMO_APPLICATIONS[3],
-    title: "Waitlisted",
-    note: "No further action needed",
-  },
-] as const;
+} from "@/lib/api/portal";
 
 const statusSteps = [
   {
@@ -85,24 +58,36 @@ function statusClass(status: string) {
   return "status-pill status-pill-pending";
 }
 
+interface SignedIn {
+  email: string;
+  application: PortalApplication;
+}
+
 export function PortalLookup() {
   const [email, setEmail] = useState("");
   const [applicationId, setApplicationId] = useState("");
-  const [application, setApplication] = useState<PortalApplication | null>(null);
-  const [error, setError] = useState(false);
+  const [signedIn, setSignedIn] = useState<SignedIn | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  function handleLookup(event: FormEvent<HTMLFormElement>) {
+  async function handleLookup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const match = findMockApplication(email, applicationId);
-    setApplication(match);
-    setError(!match);
+    if (loading) return;
+    setLoading(true);
+    setError(null);
+    const result = await lookupApplication(email.trim(), applicationId.trim());
+    setLoading(false);
+    if (result.ok) {
+      setSignedIn({ email: email.trim(), application: result.application });
+    } else {
+      setSignedIn(null);
+      setError(result.error);
+    }
   }
 
-  function loadDemo(record: PortalApplication) {
-    setEmail(record.email);
-    setApplicationId(record.applicationId);
-    setApplication(record);
-    setError(false);
+  function clearResult() {
+    setSignedIn(null);
+    setError(null);
   }
 
   return (
@@ -112,7 +97,7 @@ export function PortalLookup() {
           <div className="section-heading-icon">01</div>
           <div>
             <p className="section-overline">Application lookup</p>
-            <h2>Sign in to your portal</h2>
+            <h2>Track your application</h2>
           </div>
         </div>
         <form className="lookup-form" onSubmit={handleLookup}>
@@ -120,14 +105,13 @@ export function PortalLookup() {
             id="lookup-email"
             name="email"
             type="email"
-            label="Email address"
+            label="Email"
             placeholder="The address used for registration"
             autoComplete="email"
             value={email}
             onChange={(event) => {
               setEmail(event.currentTarget.value);
-              setApplication(null);
-              setError(false);
+              clearResult();
             }}
             required
           />
@@ -135,33 +119,34 @@ export function PortalLookup() {
             id="lookup-application-id"
             name="applicationId"
             label="Application ID"
-            placeholder="For example, TGD26-12345"
+            placeholder="For example, TGD-2026-1A2B3C4D5E6F7A8B"
             autoComplete="off"
             value={applicationId}
             onChange={(event) => {
               setApplicationId(event.currentTarget.value);
-              setApplication(null);
-              setError(false);
+              clearResult();
             }}
             required
           />
           {error ? (
             <div className="lookup-error" role="alert">
               <span aria-hidden="true">!</span>
-              <p>
-                No application was found with those details. Check your email and
-                application ID, then try again.
-              </p>
+              <p>{error}</p>
             </div>
           ) : null}
-          <button className="button button-primary lookup-button" type="submit">
-            Check status <span aria-hidden="true">→</span>
+          <button
+            className="button button-primary lookup-button"
+            type="submit"
+            disabled={loading}
+            aria-busy={loading}
+          >
+            {loading ? "Checking…" : "Check Status"} <span aria-hidden="true">→</span>
           </button>
         </form>
         <p className="lookup-help">
-          If you cannot locate your application ID, check your confirmation screen or
-          contact the organisers at{" "}
-          <a href="mailto:tlc.khi@nu.edu.pk">tlc.khi@nu.edu.pk</a>.
+          If you cannot locate your application ID, please refer to your confirmation
+          screen. For further assistance, contact us on WhatsApp at 0314 3552058 or by email
+          at <a href="mailto:tlc.khi@nu.edu.pk">tlc.khi@nu.edu.pk</a>.
         </p>
       </section>
 
@@ -185,36 +170,15 @@ export function PortalLookup() {
             <span>Committee</span>
           </div>
         </section>
-
-        <section className="demo-samples">
-          <div className="demo-samples-heading">
-            <span className="demo-label">Preview</span>
-            <h2>Explore sample statuses</h2>
-            <p>Load a fictional record to preview the portal states.</p>
-          </div>
-          <div className="demo-case-list">
-            {demoCases.map(({ application: record, title, note }) => (
-              <button
-                className="demo-case-button"
-                type="button"
-                key={record.applicationId}
-                onClick={() => loadDemo(record)}
-              >
-                <span className="demo-case-mark" aria-hidden="true">
-                  ↗
-                </span>
-                <span>
-                  <strong>{title}</strong>
-                  <small>{note}</small>
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
       </aside>
 
-      {application ? (
-        <ApplicationStatusView application={application} />
+      {signedIn ? (
+        <ApplicationStatusView
+          key={signedIn.application.applicationId}
+          email={signedIn.email}
+          application={signedIn.application}
+          onUpdate={(application) => setSignedIn({ ...signedIn, application })}
+        />
       ) : !error ? (
         <div className="portal-empty-state">
           <span className="empty-state-mark" aria-hidden="true">
@@ -223,8 +187,8 @@ export function PortalLookup() {
           <p className="section-overline">Your progress, in one place</p>
           <h2>Enter your details to get started.</h2>
           <p>
-            Your committee assignment and delegate information will appear here as soon
-            as the organisers update your application.
+            Enter the email address used for registration and your application ID to view
+            the status of your application.
           </p>
         </div>
       ) : null}
@@ -233,12 +197,14 @@ export function PortalLookup() {
 }
 
 function ApplicationStatusView({
+  email,
   application,
+  onUpdate,
 }: {
+  email: string;
   application: PortalApplication;
+  onUpdate: (application: PortalApplication) => void;
 }) {
-  const [receiptName, setReceiptName] = useState("");
-  const [receiptSelected, setReceiptSelected] = useState(false);
   const currentStep = statusIndex[application.status];
   const isSpecial =
     application.status === "action-required" || application.status === "waitlisted";
@@ -266,16 +232,7 @@ function ApplicationStatusView({
       </div>
 
       {isSpecial ? (
-        <SpecialStatus
-          application={application}
-          receiptName={receiptName}
-          receiptSelected={receiptSelected}
-          onReceiptChange={(file) => {
-            setReceiptName(file?.name ?? "");
-            setReceiptSelected(false);
-          }}
-          onReceiptSubmit={() => setReceiptSelected(true)}
-        />
+        <SpecialStatus email={email} application={application} onUpdate={onUpdate} />
       ) : (
         <>
           <div className="status-tracker" aria-label="Application progress">
@@ -297,7 +254,7 @@ function ApplicationStatusView({
                   </div>
                   <div className="tracker-step-copy">
                     <strong>{step.title}</strong>
-                    <p>{step.description}</p>
+                    <p>{isCurrent ? application.message : step.description}</p>
                   </div>
                 </div>
               );
@@ -310,42 +267,55 @@ function ApplicationStatusView({
               </span>
               <div>
                 <p className="section-overline">Your assignment</p>
-                <h3>{application.committee ?? "Your committee is ready"}</h3>
+                <h3>
+                  {application.committeeName ?? application.committee ?? "Your committee is ready"}
+                </h3>
                 {application.portfolio ? (
                   <p>Representing {application.portfolio}</p>
                 ) : null}
               </div>
-              <button className="button button-secondary" type="button" disabled>
-                Study guide coming soon
-              </button>
+              {application.studyGuideUrl ? (
+                <a
+                  className="button button-secondary"
+                  href={application.studyGuideUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open Study Guide
+                </a>
+              ) : (
+                <button className="button button-secondary" type="button" disabled>
+                  Study guide coming soon
+                </button>
+              )}
             </div>
           ) : null}
         </>
       )}
 
       {application.type === "delegation" && application.delegates?.length ? (
-        <DelegationStatusTable delegates={application.delegates} />
+        <DelegationStatusTable
+          delegates={application.delegates}
+          isHeadView={application.isHeadView}
+        />
       ) : null}
-      <p className="mock-disclaimer">
-        Preview record · Status and delegate information shown here is mock data.
-      </p>
     </section>
   );
 }
 
 function SpecialStatus({
+  email,
   application,
-  receiptName,
-  receiptSelected,
-  onReceiptChange,
-  onReceiptSubmit,
+  onUpdate,
 }: {
+  email: string;
   application: PortalApplication;
-  receiptName: string;
-  receiptSelected: boolean;
-  onReceiptChange: (file: File | null) => void;
-  onReceiptSubmit: () => void;
+  onUpdate: (application: PortalApplication) => void;
 }) {
+  const [receipt, setReceipt] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   if (application.status === "waitlisted") {
     return (
       <div className="special-status-card waitlist-card">
@@ -364,6 +334,16 @@ function SpecialStatus({
     );
   }
 
+  async function handleUpload() {
+    if (!receipt || uploading) return;
+    setUploading(true);
+    setUploadError(null);
+    const result = await resubmitReceipt(email, application.applicationId, receipt);
+    setUploading(false);
+    if (result.ok) onUpdate(result.application);
+    else setUploadError(result.error);
+  }
+
   return (
     <div className="special-status-card action-card">
       <span className="special-status-icon" aria-hidden="true">
@@ -371,53 +351,73 @@ function SpecialStatus({
       </span>
       <div>
         <p className="section-overline">Action required</p>
-        <h3>We need a clearer payment screenshot.</h3>
-        <p>
-          {application.actionReason ??
-            "We were unable to verify your payment. Please choose a new screenshot for review."}
-        </p>
-        <label className="field action-upload">
-          <span className="field-label">Upload a new screenshot</span>
-          <input
-            className="form-control file-control"
-            type="file"
-            accept="image/*,.pdf,application/pdf"
-            onChange={(event) => onReceiptChange(event.currentTarget.files?.[0] ?? null)}
-          />
-          <span className="field-hint">Image or PDF. Make sure the amount is legible.</span>
-        </label>
-        {receiptName ? (
-          <span className="selected-file" role="status">
-            Selected: {receiptName}
-          </span>
-        ) : null}
-        <button
-          className="button button-primary"
-          type="button"
-          disabled={!receiptName || receiptSelected}
-          onClick={onReceiptSubmit}
-        >
-          {receiptSelected ? "Screenshot received (demo)" : "Submit new screenshot"}
-        </button>
-        {receiptSelected ? (
-          <p className="action-confirmation" role="status">
-            Your new receipt is ready for review in this preview. No file was sent.
+        <h3>We were unable to verify your payment.</h3>
+        <p>{application.message}</p>
+        {application.canResubmitReceipt ? (
+          <>
+            <label className="field action-upload">
+              <span className="field-label">Upload a new screenshot</span>
+              <input
+                className="form-control file-control"
+                type="file"
+                accept="image/*,.pdf,application/pdf"
+                onChange={(event) => {
+                  setReceipt(event.currentTarget.files?.[0] ?? null);
+                  setUploadError(null);
+                }}
+              />
+              <span className="field-hint">
+                Image or PDF. The amount and date must be clearly legible.
+              </span>
+            </label>
+            {receipt ? (
+              <span className="selected-file" role="status">
+                Selected: {receipt.name}
+              </span>
+            ) : null}
+            {uploadError ? (
+              <div className="lookup-error" role="alert">
+                <span aria-hidden="true">!</span>
+                <p>{uploadError}</p>
+              </div>
+            ) : null}
+            <button
+              className="button button-primary"
+              type="button"
+              disabled={!receipt || uploading}
+              aria-busy={uploading}
+              onClick={handleUpload}
+            >
+              {uploading ? "Uploading…" : "Upload New Screenshot"}
+            </button>
+          </>
+        ) : (
+          <p className="field-hint">
+            Your head delegate has been asked to upload a new payment screenshot.
           </p>
-        ) : null}
+        )}
       </div>
     </div>
   );
 }
 
-function DelegationStatusTable({ delegates }: { delegates: NonNullable<PortalApplication["delegates"]> }) {
+function DelegationStatusTable({
+  delegates,
+  isHeadView,
+}: {
+  delegates: DelegateRow[];
+  isHeadView: boolean;
+}) {
   return (
     <div className="delegation-status">
       <div className="delegation-status-heading">
         <div>
           <p className="section-overline">Delegation</p>
-          <h3>Delegate progress</h3>
+          <h3>{isHeadView ? "Delegate progress" : "Your progress"}</h3>
         </div>
-        <span>{delegates.length} delegates</span>
+        <span>
+          {delegates.length} {delegates.length === 1 ? "delegate" : "delegates"}
+        </span>
       </div>
       <div className="table-wrap">
         <table>
@@ -430,11 +430,14 @@ function DelegationStatusTable({ delegates }: { delegates: NonNullable<PortalApp
             </tr>
           </thead>
           <tbody>
-            {delegates.map((delegate) => (
-              <tr key={delegate.name}>
-                <th scope="row">{delegate.name}</th>
-                <td>{delegate.committee}</td>
-                <td>{delegate.portfolio}</td>
+            {delegates.map((delegate, index) => (
+              <tr key={delegate.name + index}>
+                <th scope="row">
+                  {delegate.name}
+                  {delegate.isHead ? " (Head)" : ""}
+                </th>
+                <td>{delegate.committee ?? "Pending"}</td>
+                <td>{delegate.portfolio ?? "Pending"}</td>
                 <td>
                   <span className={statusClass(delegate.status)}>{delegate.status}</span>
                 </td>
@@ -443,10 +446,12 @@ function DelegationStatusTable({ delegates }: { delegates: NonNullable<PortalApp
           </tbody>
         </table>
       </div>
-      <p className="table-note">
-        The head delegate can view each delegate&apos;s individual committee, portfolio
-        and status.
-      </p>
+      {isHeadView ? (
+        <p className="table-note">
+          The head delegate can view each delegate&apos;s individual committee, portfolio
+          and status.
+        </p>
+      ) : null}
     </div>
   );
 }

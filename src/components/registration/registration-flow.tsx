@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { DelegationFields } from "@/components/registration/delegation-fields";
 import { PaymentSection } from "@/components/registration/payment-section";
 import { SoloDelegateFields } from "@/components/registration/solo-delegate-fields";
@@ -21,7 +21,17 @@ import {
   getCurrentRegistrationWindow,
   type RegistrationWindow,
 } from "@/data/event";
-import { saveMockRegistration, type PortalApplication } from "@/data/portal-mocks";
+import {
+  describeField,
+  submitRegistration,
+  type RegistrationSuccess,
+} from "@/lib/api/registration";
+
+function newIdempotencyKey() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
 
 export function RegistrationFlow() {
   const [registrationType, setRegistrationType] = useState<RegistrationType>("solo");
@@ -29,8 +39,12 @@ export function RegistrationFlow() {
     useState<RegistrationWindow>(CURRENT_REGISTRATION_WINDOW);
   const [solo, setSolo] = useState<SoloFormValues>(emptySoloForm);
   const [delegation, setDelegation] = useState<DelegationFormValues>(emptyDelegation);
-  const [receiptName, setReceiptName] = useState("");
-  const [confirmation, setConfirmation] = useState<PortalApplication | null>(null);
+  const [receipt, setReceipt] = useState<File | null>(null);
+  const [confirmation, setConfirmation] = useState<RegistrationSuccess | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  // One key per form fill (created on first submit), so a retry cannot create two registrations.
+  const idempotencyKey = useRef<string | null>(null);
 
   const delegateCount = registrationType === "solo" ? 1 : delegation.size;
   const total = delegateCount * registrationWindow.feePerDelegate;
@@ -100,26 +114,46 @@ export function RegistrationFlow() {
     });
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!event.currentTarget.reportValidity()) return;
+    if (submitting || !event.currentTarget.reportValidity()) return;
+    if (!receipt) {
+      setSubmitError("Please upload a screenshot of your payment before submitting.");
+      return;
+    }
 
-    const firstName =
-      registrationType === "solo" ? solo.fullName : delegation.headName;
-    const email = registrationType === "solo" ? solo.email : delegation.headEmail;
-    const delegateNames =
-      registrationType === "solo"
-        ? [solo.fullName]
-        : delegation.delegates.map((delegate) => delegate.fullName);
+    const transactionId = new FormData(event.currentTarget).get("transactionId");
+    idempotencyKey.current ??= newIdempotencyKey();
+    setSubmitting(true);
+    setSubmitError(null);
+    const result = await submitRegistration({
+      type: registrationType,
+      solo,
+      delegation,
+      receipt,
+      transactionId: typeof transactionId === "string" ? transactionId : "",
+      idempotencyKey: idempotencyKey.current,
+    });
+    setSubmitting(false);
 
-    setConfirmation(
-      saveMockRegistration({
-        email,
-        firstName: firstName.trim().split(/\s+/)[0] || "Delegate",
-        type: registrationType,
-        delegateNames,
-      }),
-    );
+    if (result.ok) {
+      setConfirmation(result.data);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      setSubmitError(
+        result.field
+          ? describeField(result.field, registrationType) + ": " + result.error
+          : result.error,
+      );
+    }
+  }
+
+  function startNewRegistration() {
+    setConfirmation(null);
+    setSolo(emptySoloForm());
+    setDelegation(emptyDelegation());
+    setReceipt(null);
+    idempotencyKey.current = null;
   }
 
   if (confirmation) {
@@ -131,30 +165,26 @@ export function RegistrationFlow() {
         <p className="section-overline">Registration received</p>
         <h2>Thank you, {confirmation.firstName}.</h2>
         <p className="confirmation-copy">
-          Your demo registration has been recorded in this browser session. In the live
-          portal, your payment will be reviewed and your committee will be allocated
-          within 1 to 3 business days after confirmation.
+          Your registration has been received. Your payment will now be reviewed. Once it
+          is confirmed, your committee will be allocated within 1 to 3 business days. You
+          may monitor your progress in the portal at any time.
         </p>
         <div className="application-id-box">
-          <span>Demo application ID</span>
+          <span>Your application ID</span>
           <strong>{confirmation.applicationId}</strong>
-          <small>Keep this ID with the email address used on the form.</small>
+          <small>
+            Please retain it, as it is required to sign in to the portal with the email
+            address used on the form.
+          </small>
         </div>
         <div className="confirmation-actions">
           <Link className="button button-primary" href="/portal">
-            Track application <span aria-hidden="true">→</span>
+            Go to Portal <span aria-hidden="true">→</span>
           </Link>
-          <button
-            className="button button-quiet"
-            type="button"
-            onClick={() => setConfirmation(null)}
-          >
-            Start another preview
+          <button className="button button-quiet" type="button" onClick={startNewRegistration}>
+            Register someone else
           </button>
         </div>
-        <p className="mock-disclaimer">
-          Preview only · No form data or payment receipt has been sent to the organisers.
-        </p>
       </section>
     );
   }
@@ -181,15 +211,6 @@ export function RegistrationFlow() {
         <div className="registration-state-banner" role="status">
           <span className="eyebrow-dot" />
           <span>{registrationWindow.description}</span>
-        </div>
-        <div className="mock-notice">
-          <span className="notice-spark" aria-hidden="true">
-            ✦
-          </span>
-          <span>
-            <strong>Frontend preview</strong> — form entries and receipt selection stay in
-            this browser and are not sent to the organisers.
-          </span>
         </div>
 
         <section className="form-card">
@@ -273,8 +294,8 @@ export function RegistrationFlow() {
           delegateCount={delegateCount}
           feePerDelegate={registrationWindow.feePerDelegate}
           rateLabel={registrationWindow.name}
-          receiptName={receiptName}
-          onReceiptChange={(file) => setReceiptName(file?.name ?? "")}
+          receiptName={receipt?.name ?? ""}
+          onReceiptChange={setReceipt}
         />
 
         <section className="submit-card">
@@ -288,11 +309,25 @@ export function RegistrationFlow() {
               </small>
             </span>
           </label>
-          <button className="button button-primary submit-button" type="submit">
-            Submit Registration <span aria-hidden="true">→</span>
+          {submitError ? (
+            <div className="lookup-error" role="alert">
+              <span aria-hidden="true">!</span>
+              <p>{submitError}</p>
+            </div>
+          ) : null}
+          <button
+            className="button button-primary submit-button"
+            type="submit"
+            disabled={submitting}
+            aria-busy={submitting}
+          >
+            {submitting ? "Submitting…" : "Submit Registration"}{" "}
+            <span aria-hidden="true">→</span>
           </button>
           <p className="submit-footnote">
-            This preview does not submit your information or process a payment.
+            By submitting this form, you confirm that the information provided is accurate.
+            All payments are final and non-refundable. Your payment will be reviewed, and
+            your status will be updated in the portal.
           </p>
         </section>
       </form>
