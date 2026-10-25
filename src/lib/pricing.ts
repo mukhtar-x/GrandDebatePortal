@@ -4,13 +4,6 @@ export const REGULAR_RATE_START = new Date("2026-11-08T00:00:00.000+05:00");
 export const EARLY_BIRD_DEADLINE = new Date(REGULAR_RATE_START.getTime() - 1);
 export const REGISTRATION_CLOSED_AT = new Date("2026-11-16T00:00:00.000+05:00");
 
-export type RegistrationPhase = "early" | "regular" | "closed";
-
-export function getRegistrationPhase(date = new Date()): RegistrationPhase {
-    if (date >= REGISTRATION_CLOSED_AT) return "closed";
-    return date < REGULAR_RATE_START ? "early" : "regular";
-}
-
 export interface Pricing {
     totalPayable: number;
     rateType: "Early bird" | "Regular";

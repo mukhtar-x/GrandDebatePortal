@@ -1,5 +1,4 @@
 import connectDB from "@/lib/db";
-import { EVENT_INFO } from "@/lib/eventInfo";
 import { firstName } from "@/lib/validation";
 import Application from "@/models/Application";
 import Committee from "@/models/Committee";
@@ -37,7 +36,8 @@ function getTransport(): MailTransport {
     return consoleTransport;
 }
 
-const SIGN_OFF = `\n\nFor queries, contact us on WhatsApp at ${EVENT_INFO.contact.whatsapp} or by email at ${EVENT_INFO.contact.email}.\nTLC, The Literary Club, FAST-NUCES Karachi`;
+const SIGN_OFF =
+    "\n\nFor queries, contact us on WhatsApp at 0314 3552058 or by email at tlc.khi@nu.edu.pk.\nTLC, The Literary Club, FAST-NUCES Karachi";
 
 function compose(event: MailEvent, name: string, applicationId: string): { subject: string; text: string } {
     const hello = `Dear ${firstName(name)},\n\n`;
