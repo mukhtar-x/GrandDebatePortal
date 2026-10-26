@@ -286,16 +286,46 @@ Keep `RUN_WRITE_TESTS` unset for routine checks and never use production data fo
 
 ## Deployment
 
-No hosting provider, deployment manifest, or production environment is configured in this
-repository. Deploy as a Node.js Next.js application on a platform that supports the project's
-Next.js version, server-side Route Handlers, required function size/runtime, and MongoDB
-connectivity; do not deploy as a static site.
+The production GitHub Actions workflow at `.github/workflows/deploy-production.yml` deploys
+this full-stack Next.js app to Vercel when `main` is updated, or when started manually from
+Actions. The frontend pages and `/api/*` Route Handlers ship together as one Vercel project;
+no separate backend deployment is needed. This must run as a server app, not a static site.
+
+### Connect GitHub Actions and Vercel
+
+1. Install/use the Vercel CLI, then switch to the TLC Vercel account: `vercel logout`,
+   `vercel login`, and confirm the account with `vercel whoami`.
+2. From the repository root, run `vercel link` and select the TLC team and the existing
+   project, or create a project for this app. Keep the project root as `.`. The link writes
+   `.vercel/project.json`, which is ignored by Git and contains the organization and project
+   IDs needed by the workflow.
+3. In the GitHub repository, open **Settings → Environments → New environment**, create
+   `production`, and add these environment secrets:
+   `VERCEL_TOKEN` (create a token while signed in to the TLC account), `VERCEL_ORG_ID`, and
+   `VERCEL_PROJECT_ID`. Read the two IDs from `.vercel/project.json`; do not commit that file
+   or put token values in the repository. The workflow uses the `production` GitHub
+   Environment, so configure secrets there.
+4. Add the app's runtime variables to the Vercel project's **Settings → Environment Variables**
+   for Production. At minimum configure `MONGODB_URI` and `ADMIN_USERS`; add the Google SMTP
+   values if email notifications should be enabled, and the receipt AI key/model only if that
+   optional feature is approved. Vercel runtime variables and GitHub Actions secrets are
+   separate stores: the workflow secrets authenticate deployment, while the Vercel variables
+   configure the deployed app. Do not commit `.env.local` or any secret.
+5. Run **Actions → Production Deployment → Run workflow** once to validate the setup. Later
+   pushes to `main` deploy automatically. Vercel Git integration can also deploy pushes on its
+   own; disable its automatic production deployment if you want GitHub Actions to be the sole
+   deployment path.
+
+The workflow builds a Vercel production artifact in GitHub Actions and uploads that prebuilt
+artifact to Vercel. The Vercel project still hosts both the website and its server-side API
+routes. Ensure the MongoDB deployment supports transactions, allows Vercel connections, and
+has backups; verify receipt processing and other runtime limits on the deployed project.
 
 Before deployment:
 
 1. Provision MongoDB with transaction support and configure network access, least-privilege
    credentials, backups, and an appropriate database name.
-2. Set `MONGODB_URI` and `ADMIN_USERS` in the host's secret manager. Give every organiser
+2. Set `MONGODB_URI` and `ADMIN_USERS` in Vercel's Production environment variables. Give every organiser
    an individual account and revoke access by removing that account and revoking its sessions.
    Add the AI
    variables only if that feature has been approved.
