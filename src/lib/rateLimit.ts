@@ -31,7 +31,7 @@ export async function consumeRateLimit(
             RateLimit.findOneAndUpdate(
                 { key: windowKey },
                 { $inc: { count: 1 }, $setOnInsert: { expiresAt: new Date(windowEnd) } },
-                { upsert: true, new: true },
+                { upsert: true, returnDocument: "after" },
             ).lean<{ count: number }>();
 
         let entry;
