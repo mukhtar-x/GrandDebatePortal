@@ -389,6 +389,79 @@ textarea:focus-visible {
   text-transform: uppercase;
 }
 
+.registration-countdown {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin: -7px 0 28px;
+  padding: 21px 25px;
+  border: 1px solid rgba(201, 160, 85, 0.38);
+  border-radius: 14px;
+  background:
+    radial-gradient(ellipse at 90% 0%, rgba(201, 160, 85, 0.12), transparent 44%),
+    linear-gradient(110deg, rgba(24, 45, 85, 0.96), rgba(13, 31, 63, 0.92));
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+}
+
+.countdown-copy {
+  min-width: 0;
+}
+
+.countdown-copy .section-overline {
+  margin-bottom: 5px;
+}
+
+.countdown-copy h2 {
+  margin: 0;
+  color: var(--desert-sand);
+  font-family: var(--font-display);
+  font-size: clamp(17px, 2.2vw, 23px);
+  letter-spacing: 0.04em;
+}
+
+.countdown-copy > p:last-child {
+  margin: 6px 0 0;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.countdown-clock {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(4, minmax(57px, 1fr));
+  gap: 8px;
+}
+
+.countdown-unit {
+  display: flex;
+  min-width: 57px;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 10px 7px;
+  border: 1px solid rgba(201, 160, 85, 0.24);
+  border-radius: 9px;
+  background: rgba(6, 19, 42, 0.45);
+}
+
+.countdown-unit strong {
+  color: var(--desert-sand);
+  font-family: var(--font-display);
+  font-size: 23px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.countdown-unit span {
+  color: var(--grand-gold);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
 .registration-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.55fr) minmax(260px, 0.72fr);
@@ -2149,6 +2222,28 @@ textarea.form-control {
   .event-strip > div {
     min-height: 59px;
     padding: 11px 15px;
+  }
+
+  .registration-countdown {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 15px;
+    margin: -6px 0 20px;
+    padding: 17px;
+  }
+
+  .countdown-clock {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .countdown-unit {
+    min-width: 0;
+    padding: 8px 4px 7px;
+  }
+
+  .countdown-unit strong {
+    font-size: 21px;
   }
 
   .registration-form {

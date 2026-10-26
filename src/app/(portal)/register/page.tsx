@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { RegistrationFlow } from "@/components/registration/registration-flow";
+import { RegistrationCountdown } from "@/components/registration/registration-countdown";
 import { EVENT_DETAILS } from "@/data/event";
 
 export const metadata: Metadata = {
@@ -53,6 +54,7 @@ export default function RegisterPage() {
             </div>
 
             <EventInfoStrip />
+            <RegistrationCountdown />
             <RegistrationFlow />
         </div>
     );
