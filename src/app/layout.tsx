@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Cinzel, Montserrat } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SiteIntroProvider } from "@/components/shared/site-intro";
 import { getPublicSiteUrl } from "@/lib/site-url";
 import "./globals.css";
@@ -82,6 +84,8 @@ export default function RootLayout({
     <html lang="en" className={cinzel.variable + " " + montserrat.variable}>
       <body>
         <SiteIntroProvider>{children}</SiteIntroProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
