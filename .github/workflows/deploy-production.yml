@@ -22,6 +22,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - run: npm install --global npm@11.21.1
       - run: npm ci
       - run: npm install --global vercel
       - run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
