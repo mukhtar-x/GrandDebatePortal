@@ -4,10 +4,34 @@ import { HeroLogoReveal } from "@/components/shared/hero-logo-reveal";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { SiteHeader } from "@/components/shared/site-header";
 import { EVENT_DETAILS } from "@/data/event";
+import type { Metadata } from "next";
+import { getCanonicalUrl, getPublicSiteUrl } from "@/lib/site-url";
+
+export const metadata: Metadata = {
+  title: { absolute: "The Grand Debate ’26 - TLC" },
+  description: "Three days of debate, diplomacy and dialogue. Join The Grand Debate '26 at FAST-NUCES Karachi, 18–20 November 2026.",
+  alternates: getCanonicalUrl("/") ? { canonical: getCanonicalUrl("/") } : undefined,
+};
 
 export default function Home() {
+  const siteUrl = getPublicSiteUrl();
+  const eventStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: EVENT_DETAILS.name,
+    description: "Three days of debate, diplomacy and dialogue hosted by TLC, FAST-NUCES Karachi.",
+    startDate: "2026-11-18T08:00:00+05:00",
+    endDate: "2026-11-20T16:00:00+05:00",
+    eventStatus: "https://schema.org/EventScheduled",
+    eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+    location: { "@type": "Place", name: EVENT_DETAILS.venue, address: { "@type": "PostalAddress", addressLocality: "Karachi", addressCountry: "PK" } },
+    organizer: { "@type": "Organization", name: EVENT_DETAILS.organizer, email: EVENT_DETAILS.contactEmail },
+    ...(siteUrl ? { url: siteUrl.toString() } : {}),
+  };
+
   return (
     <div className="portal-site">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(eventStructuredData).replace(/</g, "\\u003c") }} />
       <SiteHeader />
       <main className="portal-main">
         <section className="home-hero">

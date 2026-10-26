@@ -2,11 +2,14 @@ import type { Metadata } from "next";
 import { ActionIcon } from "@/components/shared/action-icon";
 import Image from "next/image";
 import { COMMITTEE_DETAILS } from "@/data/committee-details";
+import { getCanonicalUrl } from "@/lib/site-url";
 
 export const metadata: Metadata = {
-  title: "Committees · The Grand Debate '26",
+  title: "Committees",
   description:
     "Explore the five committees at The Grand Debate '26 and find the debate that suits you.",
+  alternates: getCanonicalUrl("/committees") ? { canonical: getCanonicalUrl("/committees") } : undefined,
+  openGraph: { title: "Committees at The Grand Debate '26", description: "Explore the five Model UN committees and choose your debate at The Grand Debate '26." },
 };
 
 export default function CommitteesPage() {

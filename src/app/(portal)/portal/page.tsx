@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { PortalLookup } from "@/components/portal/portal-lookup";
 
 export const metadata: Metadata = {
-    title: "Track your application · The Grand Debate '26",
+    title: "Track your application",
     description: "Look up your registration and track your application status.",
+    robots: { index: false, follow: false },
+    openGraph: { title: "Track your application · The Grand Debate '26", description: "Look up your registration and track your application status." },
 };
 
 export default function PortalPage() {

@@ -2,11 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { COMMITTEE_DETAILS } from "@/data/committee-details";
 import { ActionIcon } from "@/components/shared/action-icon";
+import { getCanonicalUrl } from "@/lib/site-url";
 
 export const metadata: Metadata = {
-  title: "Document archive · The Grand Debate '26",
+  title: "Document archive",
   description:
     "Study guides, rules of procedure and reference material for Grand Debate delegates.",
+  alternates: getCanonicalUrl("/archive") ? { canonical: getCanonicalUrl("/archive") } : undefined,
+  openGraph: { title: "Delegate resources · The Grand Debate '26", description: "Study guides, rules of procedure and reference material for delegates." },
 };
 
 const GENERAL_RESOURCES = [

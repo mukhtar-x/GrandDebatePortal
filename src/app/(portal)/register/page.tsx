@@ -3,10 +3,13 @@ import Image from "next/image";
 import { RegistrationFlow } from "@/components/registration/registration-flow";
 import { RegistrationCountdown } from "@/components/registration/registration-countdown";
 import { EVENT_DETAILS } from "@/data/event";
+import { getCanonicalUrl } from "@/lib/site-url";
 
 export const metadata: Metadata = {
-    title: "Register · The Grand Debate '26",
+    title: "Register",
     description: "Register as a solo delegate or delegation for The Grand Debate '26.",
+    alternates: getCanonicalUrl("/register") ? { canonical: getCanonicalUrl("/register") } : undefined,
+    openGraph: { title: "Register for The Grand Debate '26", description: "Register as a solo delegate or delegation for The Grand Debate '26 at FAST-NUCES Karachi." },
 };
 
 function EventInfoStrip() {
