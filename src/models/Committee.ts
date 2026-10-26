@@ -7,6 +7,7 @@ export interface ICommittee {
     suitedTo: string;
     level: string;
     totalSeats: number;
+    allocationRevision: number;
     studyGuideUrl?: string;
     active: boolean;
     createdAt: Date;
@@ -21,6 +22,8 @@ const committeeSchema = new Schema<ICommittee>(
         suitedTo: { type: String, required: true, trim: true },
         level: { type: String, required: true, trim: true },
         totalSeats: { type: Number, required: true, default: 0, min: 0 },
+        // Incremented inside allocation transactions to serialize checks for this committee.
+        allocationRevision: { type: Number, required: true, default: 0 },
         studyGuideUrl: { type: String, trim: true },
         active: { type: Boolean, required: true, default: true, index: true },
     },

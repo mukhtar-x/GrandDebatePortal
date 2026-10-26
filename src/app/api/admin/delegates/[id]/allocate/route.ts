@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { after } from "next/server";
 import { requireAdminMutation } from "@/lib/adminAuth";
+import Committee from "@/models/Committee";
 import { canonicalCommittee, syncApplicationStatus } from "@/lib/allocation";
 import { notifyDelegate } from "@/lib/mailer";
 import { readJsonBody } from "@/lib/requestGuards";
@@ -40,7 +41,7 @@ export async function POST(
     request: Request,
     ctx: RouteContext<"/api/admin/delegates/[id]/allocate">,
 ): Promise<Response> {
-    const auth = requireAdminMutation(request);
+    const auth = await requireAdminMutation(request);
     if (auth.response) return auth.response;
 
     const id = await delegateId(ctx);
@@ -69,12 +70,24 @@ export async function POST(
                 throw new AllocationError("Confirm the payment before allocating a committee.", 409, "PAYMENT_NOT_CONFIRMED");
             }
 
-            if (committee.totalSeats > 0) {
+            // All allocations into a committee increment the same document in the transaction.
+            // Concurrent transactions therefore conflict and retry against the committed seat
+            // and portfolio state instead of both passing stale count checks.
+            const allocationLock = await Committee.findOneAndUpdate(
+                { code: committee.code, active: true },
+                { $inc: { allocationRevision: 1 } },
+                { returnDocument: "after", session },
+            ).select("code totalSeats").lean<{ code: string; totalSeats: number }>();
+            if (!allocationLock) {
+                throw new AllocationError("Committee is no longer available.", 409, "COMMITTEE_UNAVAILABLE");
+            }
+
+            if (allocationLock.totalSeats > 0) {
                 const taken = await Delegate.countDocuments({ assignedCommittee: committee.code, _id: { $ne: id } }).session(
                     session,
                 );
-                if (taken >= committee.totalSeats) {
-                    throw new AllocationError(`${committee.code} is full (${committee.totalSeats} seats).`, 409, "COMMITTEE_FULL");
+                if (taken >= allocationLock.totalSeats) {
+                    throw new AllocationError(`${committee.code} is full (${allocationLock.totalSeats} seats).`, 409, "COMMITTEE_FULL");
                 }
             }
 
@@ -119,7 +132,7 @@ export async function DELETE(
     request: Request,
     ctx: RouteContext<"/api/admin/delegates/[id]/allocate">,
 ): Promise<Response> {
-    const auth = requireAdminMutation(request);
+    const auth = await requireAdminMutation(request);
     if (auth.response) return auth.response;
 
     const id = await delegateId(ctx);
