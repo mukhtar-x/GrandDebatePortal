@@ -2572,6 +2572,10 @@ textarea.form-control {
   transition: opacity 350ms ease;
 }
 
+.site-intro-content {
+  display: contents;
+}
+
 .site-intro.is-leaving {
   pointer-events: none;
   opacity: 0;
@@ -2622,6 +2626,12 @@ textarea.form-control {
   border-color: var(--grand-gold);
   background: rgba(8, 21, 45, 0.86);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.site-intro-skip:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 4px;
+  border-color: var(--grand-gold);
 }
 
 .site-intro-skip:active {

@@ -19,10 +19,12 @@ export function SiteIntroProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [introFinished, setIntroFinished] = useState(true);
   const [showIntro, setShowIntro] = useState(false);
+  const isHomeRoute = pathname === "/";
   const isAdminRoute = pathname === "/admin" || pathname?.startsWith("/admin/");
+  const introActive = showIntro && !introFinished && isHomeRoute && !isAdminRoute;
 
   useEffect(() => {
-    if (isAdminRoute) return;
+    if (!isHomeRoute || isAdminRoute) return;
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const mobile = window.matchMedia("(max-width: 760px)");
@@ -50,7 +52,7 @@ export function SiteIntroProvider({ children }: { children: ReactNode }) {
       mobile.removeEventListener("change", syncIntro);
       reduceMotion.removeEventListener("change", syncIntro);
     };
-  }, [isAdminRoute]);
+  }, [isAdminRoute, isHomeRoute]);
 
   const finishIntro = useCallback(() => {
     setIntroFinished(true);
@@ -63,8 +65,10 @@ export function SiteIntroProvider({ children }: { children: ReactNode }) {
 
   return (
     <IntroFinishedContext.Provider value={introFinished}>
-      {children}
-      {showIntro && !isAdminRoute ? <SiteIntro onFinished={finishIntro} /> : null}
+      <div className="site-intro-content" inert={introActive || undefined} aria-hidden={introActive || undefined}>
+        {children}
+      </div>
+      {introActive ? <SiteIntro onFinished={finishIntro} /> : null}
     </IntroFinishedContext.Provider>
   );
 }
@@ -73,6 +77,7 @@ function SiteIntro({ onFinished }: { onFinished: () => void }) {
   const [isLeaving, setIsLeaving] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const dismissed = useRef(false);
+  const skipButtonRef = useRef<HTMLButtonElement>(null);
 
   const dismiss = useCallback(() => {
     if (dismissed.current) return;
@@ -87,6 +92,26 @@ function SiteIntro({ onFinished }: { onFinished: () => void }) {
     if (reduceMotion.matches) {
       dismiss();
     }
+
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    skipButtonRef.current?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        dismiss();
+      } else if (event.key === "Tab") {
+        event.preventDefault();
+        skipButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
   }, [dismiss]);
 
   if (!isVisible) return null;
@@ -94,6 +119,9 @@ function SiteIntro({ onFinished }: { onFinished: () => void }) {
   return (
     <div
       className={isLeaving ? "site-intro is-leaving" : "site-intro"}
+      role="dialog"
+      aria-modal="true"
+      aria-label="The Grand Debate introduction"
       aria-hidden={isLeaving}
     >
       <video
@@ -110,7 +138,7 @@ function SiteIntro({ onFinished }: { onFinished: () => void }) {
         <source src={INTRO_VIDEO} type="video/mp4" />
       </video>
       <div className="site-intro-vignette" />
-      <button className="site-intro-skip" type="button" onClick={dismiss}>
+      <button ref={skipButtonRef} className="site-intro-skip" type="button" onClick={dismiss}>
         Skip intro <ActionIcon />
       </button>
     </div>
