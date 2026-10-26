@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/adminAuth";
 
 export async function GET(request: Request): Promise<Response> {
-    const auth = requireAdmin(request);
+    const auth = await requireAdmin(request);
     if (auth.response) return auth.response;
 
     return Response.json({

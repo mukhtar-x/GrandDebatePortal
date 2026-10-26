@@ -1,9 +1,9 @@
-import { adminSessionCookie, checkAdminPassword, isAdminConfigured } from "@/lib/adminAuth";
+import { adminSessionCookie, authenticateAdmin, createAdminSession, isAdminConfigured } from "@/lib/adminAuth";
 import { consumeRateLimit, rateLimitedResponse } from "@/lib/rateLimit";
 import { getClientIp, readJsonBody, rejectCrossOrigin } from "@/lib/requestGuards";
-import { MAX_LENGTHS, isRecord, normalizeString } from "@/lib/validation";
+import { isRecord } from "@/lib/validation";
 
-/** Body: { password, name } — name identifies the organiser in review records. */
+/** Body: { userId, password } — identity comes from the server-side organiser allowlist. */
 export async function POST(request: Request): Promise<Response> {
     const crossOrigin = rejectCrossOrigin(request);
     if (crossOrigin) return crossOrigin;
@@ -16,18 +16,25 @@ export async function POST(request: Request): Promise<Response> {
     if (!limit.allowed) return rateLimitedResponse(limit.retryAfterSeconds);
 
     const body = await readJsonBody(request);
+    const userId = isRecord(body) && typeof body.userId === "string" ? body.userId.trim().toLowerCase() : "";
     const password = isRecord(body) && typeof body.password === "string" ? body.password : "";
-    const name = isRecord(body) ? normalizeString(body.name) : undefined;
 
-    if (typeof name !== "string" || !name || name.length > MAX_LENGTHS.name) {
-        return Response.json({ success: false, error: "Please enter your name." }, { status: 400 });
+    if (!userId || !/^[a-zA-Z0-9_-]{3,50}$/.test(userId)) {
+        return Response.json({ success: false, error: "Enter a valid organiser user ID." }, { status: 400 });
     }
-    if (!checkAdminPassword(password)) {
+    const user = await authenticateAdmin(userId, password);
+    if (!user) {
         return Response.json({ success: false, error: "Incorrect password." }, { status: 401 });
     }
 
-    return Response.json(
-        { success: true, name },
-        { headers: { "Set-Cookie": adminSessionCookie(name) } },
-    );
+    try {
+        const session = await createAdminSession(user);
+        return Response.json(
+            { success: true, name: user.name },
+            { headers: { "Set-Cookie": adminSessionCookie(session.token) } },
+        );
+    } catch (error) {
+        console.error("Admin session could not be created:", error);
+        return Response.json({ success: false, error: "Admin sign-in is temporarily unavailable." }, { status: 503 });
+    }
 }

@@ -145,7 +145,7 @@ export default function AdminDashboard() {
     const [sessionName, setSessionName] = useState("");
     const [authenticated, setAuthenticated] = useState(false);
     const [checkingSession, setCheckingSession] = useState(true);
-    const [loginName, setLoginName] = useState("");
+    const [loginUserId, setLoginUserId] = useState("");
     const [password, setPassword] = useState("");
     const [loginBusy, setLoginBusy] = useState(false);
     const [error, setError] = useState("");
@@ -283,11 +283,11 @@ export default function AdminDashboard() {
             const response = await fetch("/api/admin/login", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ name: loginName.trim(), password }),
+                body: JSON.stringify({ userId: loginUserId.trim(), password }),
             });
             const body = await jsonResponse<ApiResult & { name?: string }>(response);
             if (!response.ok) throw new Error(responseError(body, "Sign-in failed."));
-            setSessionName(body.name ?? loginName.trim());
+            setSessionName(body.name ?? loginUserId.trim());
             setPassword("");
             setAuthenticated(true);
         } catch (loginError) {
@@ -543,12 +543,12 @@ export default function AdminDashboard() {
                     <div className="admin-mark" aria-hidden="true">GD</div>
                     <p className="admin-eyebrow">The Grand Debate ’26</p>
                     <h1>Organiser sign in</h1>
-                    <p className="admin-muted">Use your configured admin password. Your session is protected by an HttpOnly cookie.</p>
+                            <p className="admin-muted">Sign in with your individual organiser account. Sessions are revocable and expire after 12 hours.</p>
                     {error && <div className="admin-alert" role="alert">{error}</div>}
                     <form className="admin-login-form" onSubmit={signIn}>
                         <label>
-                            Organiser name
-                            <input autoComplete="username" value={loginName} onChange={(event) => setLoginName(event.target.value)} required maxLength={100} />
+                            Organiser user ID
+                            <input autoComplete="username" value={loginUserId} onChange={(event) => setLoginUserId(event.target.value)} required maxLength={50} pattern="[A-Za-z0-9_-]{3,50}" />
                         </label>
                         <label>
                             Admin password
@@ -558,7 +558,7 @@ export default function AdminDashboard() {
                             {loginBusy ? "Signing in…" : "Sign in securely"}
                         </button>
                     </form>
-                    <p className="admin-footnote">Admin access requires the server-side <code>ADMIN_PASSWORD</code> setting.</p>
+                    <p className="admin-footnote">Admin accounts are configured individually by the deployment administrator.</p>
                 </section>
             </main>
         );

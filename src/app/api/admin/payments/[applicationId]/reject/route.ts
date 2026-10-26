@@ -19,7 +19,7 @@ export async function POST(
     request: Request,
     ctx: RouteContext<"/api/admin/payments/[applicationId]/reject">,
 ): Promise<Response> {
-    const auth = requireAdminMutation(request);
+    const auth = await requireAdminMutation(request);
     if (auth.response) return auth.response;
 
     const applicationId = (await ctx.params).applicationId.trim().toUpperCase();

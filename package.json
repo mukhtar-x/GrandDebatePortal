@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "email:smoke": "node --env-file=.env.local --import tsx scripts/email-smoke-test.ts",
+    "admin:hash": "tsx scripts/hash-admin-password.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

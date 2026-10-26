@@ -12,7 +12,7 @@ const TIME_BUDGET_MS = 40_000;
  * Each call handles a batch; call again while `remaining` is above 0.
  */
 export async function POST(request: Request): Promise<Response> {
-    const auth = requireAdminMutation(request);
+    const auth = await requireAdminMutation(request);
     if (auth.response) return auth.response;
 
     try {

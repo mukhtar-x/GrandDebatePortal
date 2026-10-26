@@ -129,7 +129,7 @@ Keep visual components responsible for rendering fields and user feedback. Reque
 
 ## Admin operations
 
-- `/admin` authenticates through the existing `/api/admin/login` flow and a signed, HttpOnly session cookie. Configure `ADMIN_PASSWORD` with at least eight characters in `.env.local`; the dashboard does not store the secret in browser storage.
+- `/admin` authenticates organisers through `/api/admin/login` using individual `ADMIN_USERS` entries with scrypt password hashes. HttpOnly session cookies are backed by revocable MongoDB session records; admin mutations are written to the append-only audit log.
 - The dashboard connects to the admin APIs for application search/filtering and roster details, payment confirmation and action requests, secure receipt viewing, receipt reanalysis and batch checks, CSV export, committee edits, allocation, waitlisting and allocation removal.
 - When an organiser marks a payment `Action Required`, the head delegate uploads a corrected screenshot from the applicant status page using `POST /api/status/receipt`. The admin dashboard only requests a correction and reviews the applicant's replacement; organisers do not upload receipts.
 - `npm run seed` runs `scripts/seed.ts`, which upserts the five committee records and two development registrations. It requires `MONGODB_URI` in `.env.local`. Seed application IDs and emails are fixed so reruns update those same records; use only against a development database.

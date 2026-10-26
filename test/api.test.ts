@@ -217,11 +217,12 @@ if (serverAvailable) {
             assert.equal(response.status, 409);
         });
 
+        if (process.env.RUN_ADMIN_CRUD_TESTS === "1" && process.env.TEST_ADMIN_USER_ID && process.env.TEST_ADMIN_PASSWORD) {
         await test("Admin CRUD: can update and verify committee and application in database", async () => {
             const loginRes = await fetch(`${baseUrl}/api/admin/login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", Origin: baseUrl },
-                body: JSON.stringify({ password: "admin12345", name: "Audit Suite" }),
+                body: JSON.stringify({ userId: process.env.TEST_ADMIN_USER_ID, password: process.env.TEST_ADMIN_PASSWORD }),
             });
             assert.equal(loginRes.status, 200);
             const cookie = loginRes.headers.get("set-cookie")?.split(";")[0] ?? "";
@@ -259,6 +260,10 @@ if (serverAvailable) {
             assert.equal(appPatchData.application?.institution, "FAST NUCES Karachi Main Campus");
             assert.equal(appPatchData.application?.status, "Payment under review");
         });
+        } else {
+            skipped += 1;
+            console.info("SKIP admin CRUD writes (set RUN_ADMIN_CRUD_TESTS=1 and TEST_ADMIN_USER_ID/TEST_ADMIN_PASSWORD for a development admin account).");
+        }
     } else {
         skipped += 3;
         console.info("SKIP database-backed status/receipt checks (the API server is up, but MongoDB is unavailable).");

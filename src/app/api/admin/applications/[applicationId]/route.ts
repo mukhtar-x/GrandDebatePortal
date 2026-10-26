@@ -11,7 +11,7 @@ export async function GET(
     request: Request,
     ctx: RouteContext<"/api/admin/applications/[applicationId]">,
 ): Promise<Response> {
-    const auth = requireAdmin(request);
+    const auth = await requireAdmin(request);
     if (auth.response) return auth.response;
 
     const applicationId = (await ctx.params).applicationId.trim().toUpperCase();
@@ -39,7 +39,7 @@ export async function PATCH(
     request: Request,
     ctx: RouteContext<"/api/admin/applications/[applicationId]">,
 ): Promise<Response> {
-    const auth = requireAdminMutation(request);
+    const auth = await requireAdminMutation(request);
     if (auth.response) return auth.response;
 
     const applicationId = (await ctx.params).applicationId.trim().toUpperCase();
@@ -85,7 +85,7 @@ export async function PATCH(
             const app = await Application.findOneAndUpdate(
                 { applicationId },
                 { $set: updates },
-                { new: true, runValidators: true, session },
+                { returnDocument: "after", runValidators: true, session },
             )
                 .select("-__v -idempotencyKey")
                 .lean();
@@ -108,7 +108,7 @@ export async function DELETE(
     request: Request,
     ctx: RouteContext<"/api/admin/applications/[applicationId]">,
 ): Promise<Response> {
-    const auth = requireAdminMutation(request);
+    const auth = await requireAdminMutation(request);
     if (auth.response) return auth.response;
 
     const applicationId = (await ctx.params).applicationId.trim().toUpperCase();

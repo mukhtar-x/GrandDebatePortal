@@ -16,7 +16,7 @@ const RISK_LEVELS = ["low", "medium", "high"] as const;
  * `pendingChecks` is how many receipts still need a full (OCR) check.
  */
 export async function GET(request: Request): Promise<Response> {
-    const auth = requireAdmin(request);
+    const auth = await requireAdmin(request);
     if (auth.response) return auth.response;
 
     const params = new URL(request.url).searchParams;

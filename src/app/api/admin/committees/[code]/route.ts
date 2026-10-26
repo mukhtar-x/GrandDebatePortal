@@ -16,7 +16,7 @@ const TEXT_FIELDS = { name: 150, agenda: 500, suitedTo: 500, level: 50 } as cons
  * Executes inside MongoDB transaction to prevent accidental partial writes.
  */
 export async function PATCH(request: Request, ctx: RouteContext<"/api/admin/committees/[code]">): Promise<Response> {
-    const auth = requireAdminMutation(request);
+    const auth = await requireAdminMutation(request);
     if (auth.response) return auth.response;
 
     const rawCode = decodeURIComponent((await ctx.params).code);
@@ -84,7 +84,7 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/admin/comm
                     ...(Object.keys(set).length ? { $set: set } : {}),
                     ...(Object.keys(unset).length ? { $unset: unset } : {}),
                 },
-                { new: true, runValidators: true, session, upsert: true },
+                { returnDocument: "after", runValidators: true, session, upsert: true },
             )
                 .select("-_id -__v")
                 .lean();
@@ -98,7 +98,7 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/admin/comm
 
 /** Deletes or deactivates a committee within a transaction to protect assigned delegates. */
 export async function DELETE(request: Request, ctx: RouteContext<"/api/admin/committees/[code]">): Promise<Response> {
-    const auth = requireAdminMutation(request);
+    const auth = await requireAdminMutation(request);
     if (auth.response) return auth.response;
 
     const rawCode = decodeURIComponent((await ctx.params).code);

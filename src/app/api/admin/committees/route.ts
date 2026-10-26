@@ -9,7 +9,7 @@ import Delegate from "@/models/Delegate";
 import Payment from "@/models/Payment";
 
 export async function GET(request: Request): Promise<Response> {
-    const auth = requireAdmin(request);
+    const auth = await requireAdmin(request);
     if (auth.response) return auth.response;
 
     try {
@@ -69,7 +69,7 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-    const auth = requireAdminMutation(request);
+    const auth = await requireAdminMutation(request);
     if (auth.response) return auth.response;
 
     const body = await readJsonBody(request);

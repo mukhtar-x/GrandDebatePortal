@@ -39,7 +39,7 @@ function csvCell(value: unknown): string {
 
 /** One row per delegate, joined with application and payment details. */
 export async function GET(request: Request): Promise<Response> {
-    const auth = requireAdmin(request);
+    const auth = await requireAdmin(request);
     if (auth.response) return auth.response;
 
     try {

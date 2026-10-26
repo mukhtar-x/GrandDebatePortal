@@ -4,7 +4,7 @@ import { openReceipt } from "@/lib/receipts/store";
 
 /** Streams a stored receipt to a signed-in organiser. Receipts are never public. */
 export async function GET(request: Request, ctx: RouteContext<"/api/admin/receipts/[fileId]">): Promise<Response> {
-    const auth = requireAdmin(request);
+    const auth = await requireAdmin(request);
     if (auth.response) return auth.response;
 
     try {
