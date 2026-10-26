@@ -18,14 +18,6 @@ const nextConfig: NextConfig = {
       "./node_modules/@tesseract.js-data/eng/4.0.0_best_int/*",
     ],
   },
-  turbopack: {
-    rules: {
-      "*.css": {
-        loaders: ["@tailwindcss/turbopack"],
-        as: "*.css",
-      },
-    },
-  },
   async headers() {
     return [
       {
