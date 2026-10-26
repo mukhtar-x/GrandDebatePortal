@@ -40,7 +40,6 @@ export function HeroLogoReveal() {
       autoPlay={shouldAnimate}
       muted
       playsInline
-      loop
       preload="auto"
       poster="/assets/05_Videos/tgd_logo_reveal_final_frame.png"
       onCanPlay={() => {

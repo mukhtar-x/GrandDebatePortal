@@ -25,14 +25,31 @@ export function SiteIntroProvider({ children }: { children: ReactNode }) {
     if (isAdminRoute) return;
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    try {
-      if (localStorage.getItem(INTRO_SEEN_KEY) || reduceMotion.matches) return;
-    } catch {
-      // Storage can be unavailable in private browsing; the intro remains skippable.
-    }
+    const mobile = window.matchMedia("(max-width: 760px)");
+    const syncIntro = () => {
+      if (mobile.matches || reduceMotion.matches) {
+        setIntroFinished(true);
+        setShowIntro(false);
+        return;
+      }
 
-    setIntroFinished(false);
-    setShowIntro(true);
+      try {
+        if (localStorage.getItem(INTRO_SEEN_KEY)) return;
+      } catch {
+        // Storage can be unavailable in private browsing; the intro remains skippable.
+      }
+
+      setIntroFinished(false);
+      setShowIntro(true);
+    };
+
+    syncIntro();
+    mobile.addEventListener("change", syncIntro);
+    reduceMotion.addEventListener("change", syncIntro);
+    return () => {
+      mobile.removeEventListener("change", syncIntro);
+      reduceMotion.removeEventListener("change", syncIntro);
+    };
   }, [isAdminRoute]);
 
   const finishIntro = useCallback(() => {
