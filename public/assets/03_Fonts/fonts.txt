@@ -1,0 +1,13 @@
+THE GRAND DEBATE '26 — FONTS (all free on Google Fonts)
+
+Headings / titles:  Cinzel (weights 600, 700), in CAPITALS with a little letter-spacing
+                    https://fonts.google.com/specimen/Cinzel
+Body text:          Montserrat (weights 400, 500, 600)
+                    https://fonts.google.com/specimen/Montserrat
+
+Embed code:
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+
+CSS:
+  h1, h2, h3 { font-family: "Cinzel", Georgia, serif; letter-spacing: 0.06em; }
+  body       { font-family: "Montserrat", Arial, sans-serif; }

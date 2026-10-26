@@ -1,100 +1,360 @@
-# The Grand Debate '26
+# The Grand Debate '26 Portal
 
-Website and registration portal for **The Grand Debate '26**, organised by TLC (The Literary Club), FAST-NUCES Karachi.
+The Grand Debate '26 is a website and registration portal for The Literary Club (TLC),
+FAST-NUCES Karachi. It combines public event information, delegate registration and status
+lookup, document access, and an authenticated organiser dashboard.
 
-## Event at a glance
+> **Operational status:** Core website and portal functionality is implemented in the
+> repository. This README describes the code, not a production readiness certification.
+> No production deployment or production database has been validated as part of this work.
+
+## Event information
 
 | Detail | Information |
 | --- | --- |
 | Dates | 18–20 November 2026 |
 | Daily timings | 8:00 AM–4:00 PM |
 | Venue | FAST-NUCES Karachi Main Campus, National Highway |
-| Who can attend | School and university students |
-| Delegation size | 4–7 delegates, including the head delegate |
+| Audience | School and university students |
+| Registration types | Solo delegate or delegation of 4–7 |
 | Committees | UNSC, DISEC, SOCHUM, UN Women, PNA |
-| Committee allocation | Within 1–3 business days after payment confirmation |
+| Allocation target | Within 1–3 business days after payment confirmation |
 | Refunds | Registrations are final and non-refundable |
 
-The event is a three-day platform for debate, diplomacy, dialogue, and constructive discourse. No prior Model United Nations (MUN) experience is required. Study guides will be provided, and committee chairs will support first-time delegates.
+The event date, rates, registration windows, contacts, and committee choices are application
+data and should be re-confirmed with organisers before launch.
 
-## Registration and fees
+## Features and implementation status
 
-Applicants can register as a solo delegate or as a delegation:
+### Implemented in the code
 
-- **Solo:** one delegate.
-- **Delegation:** four to seven delegates from the same institution, submitted together with one payment.
-- Select first and second committee preferences. Organisers will make every effort to honour one of the top preferences, but placement is not guaranteed because seats are limited and committees must be balanced.
-- Provide delegate names, email addresses, WhatsApp numbers, experience level, and preferences. Delegations also provide their institution and a head delegate as the primary contact.
-- Upload one clear payment receipt image or PDF for the registration. A transaction ID is optional.
-- Applicants need their application ID and registration email to check status in the portal.
+- Public home, committee, registration, applicant portal, archive, and admin pages.
+- Solo and delegation registration forms; delegation size is limited to 4–7 people.
+- Server-side validation of delegate data, phone numbers, preferences, and pricing.
+- Early-bird and regular fee calculation using the `Asia/Karachi` registration-window rules.
+- Payment-receipt upload and resubmission. Files are type-checked by content, size-limited,
+  and stored in MongoDB GridFS; image receipts are normalized before storage.
+- OCR and receipt review signals, including hashes, duplicate/editing indicators, and an
+  optional vision-model second opinion. AI results are advisory and do not confirm payments.
+- Application lookup by registration email and application ID, with payment and delegate
+  status information.
+- Admin sign-in, application/roster review, payment confirmation or action-required response,
+  receipt viewing/reanalysis, CSV export, and committee/delegate management.
+- Committee creation/editing, capacity tracking, delegate allocation, waitlisting, and
+  allocation removal.
+- Static public event rulebook and committee study-guide PDFs under `public/docs/`.
+- Seed script and API tests for development workflows.
 
-| Registration window | Fee per delegate | Total for 1 | Total for 4 | Total for 5 | Total for 6 | Total for 7 |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Early bird, through 7 November 2026 | PKR 2,000 | PKR 2,000 | PKR 8,000 | PKR 10,000 | PKR 12,000 | PKR 14,000 |
-| Regular, 8–15 November 2026 | PKR 2,400 | PKR 2,400 | PKR 9,600 | PKR 12,000 | PKR 14,400 | PKR 16,800 |
-| From 16 November 2026 | Registration closed | — | — | — | — | — |
+### Implemented but requiring operational setup or verification
 
-The registration form should calculate the total from the delegate count and active rate. Payment account details are pending confirmation.
+- MongoDB-backed registration, receipt storage, status lookup, and organiser operations
+  require a reachable MongoDB deployment.
+- Admin access requires individual accounts in `ADMIN_USERS`.
+- Optional receipt AI analysis requires a provider key and model. It is disabled unless both
+  are configured.
+- Deployment configuration, production database behavior, backups, monitoring, and end-to-end
+  operation have not been certified here.
 
-## Committees
+### Not implemented or awaiting organiser confirmation
 
-Agendas are to be announced. Study guides should be shown as “Coming soon” until they are uploaded.
+- Transactional email delivery uses Google SMTP with OAuth2 when the mail environment variables
+  are configured. Delivery failures are logged and do not roll back registration or payment
+  operations; there is not yet a durable retry queue.
+- Payment account title and transfer instructions need organiser approval.
+- Final agendas, committee levels/capacities, and any other event-specific committee details
+  need confirmation. A seat count of `0` means unlimited in the admin interface.
+- Sponsor content and final event copy need confirmation.
+- Production deployment, monitoring, backups, privacy/retention policy, and a live operational
+  test remain to be completed.
+- Review the homepage against the final event brief before launch; any additional campaign
+  sections requested by organisers should be tracked and implemented separately.
 
-| Committee | Suited to |
+## Technology
+
+- **Next.js 16 App Router**, React 19, and TypeScript.
+- **MongoDB** with **Mongoose** for applications, delegates, payments, committees, rate limits,
+  and receipt metadata/files.
+- **Tailwind CSS 4** and project-specific CSS for the visual system.
+- **Sharp** for receipt-image processing; **Tesseract.js** and English trained data for OCR;
+  **unpdf** for PDF text extraction.
+- Optional OpenAI-compatible vision endpoint for receipt second-opinion checks.
+- ESLint 9, TypeScript, `tsx` scripts, and Node's test/assert utilities.
+
+The application is a Next.js Node application, not a static export. Interactive browser
+features are kept in client components; pages, data access, and API handlers run on the
+server. `next.config.ts` enables React Compiler, Cache Components and partial prefetching,
+adds security headers, and includes Tesseract worker/data files in API function tracing.
+
+## Architecture and data flow
+
+```text
+Browser
+  ├── Public pages and registration/status client components
+  └── /admin dashboard
+          │ same-origin requests
+          ▼
+Next.js App Router pages and Route Handlers (src/app)
+  ├── src/lib: validation, pricing, auth, receipt processing, database and mail
+  ├── src/models: Mongoose schemas
+  └── MongoDB
+       ├── application/delegate/payment/committee records
+       └── GridFS bucket "receipts" for uploaded payment files
+```
+
+### Source layout
+
+| Location | Responsibility |
 | --- | --- |
-| United Nations Security Council (UNSC) | Delegates comfortable with fast-paced, high-stakes negotiation. |
-| Disarmament and International Security Committee (DISEC) | Delegates who prefer structured, evidence-based argument on peace, security, and disarmament. |
-| Social, Humanitarian and Cultural Committee (SOCHUM) | Delegates interested in human rights, social welfare, and cultural issues. |
-| United Nations Entity for Gender Equality and the Empowerment of Women (UN Women) | Delegates who wish to argue from evidence and conviction on gender equality. |
-| Pakistan National Assembly (PNA) | Delegates interested in domestic policy and parliamentary debate. |
+| `src/app/page.tsx` | Public landing page |
+| `src/app/(portal)/` | Shared public shell and committees, registration, portal, and archive pages |
+| `src/app/admin/` | Organiser dashboard page and styles |
+| `src/app/api/` | Registration, status, committee, and admin Route Handlers |
+| `src/components/registration/` | Registration form and its field sections |
+| `src/components/portal/` | Applicant status lookup and receipt resubmission UI |
+| `src/components/admin/` | Admin dashboard and application/committee workflows |
+| `src/components/shared/` | Site header, navigation, intro, hero, and footer |
+| `src/data/` | Event and committee display data |
+| `src/lib/` | Shared domain logic, database connection, auth, API helpers, OCR/receipt processing |
+| `src/models/` | Mongoose models for Application, Delegate, Payment, Committee, and RateLimit |
+| `scripts/seed.ts` | Development committee and demo-registration seed data |
+| `test/api.test.ts` | Validation checks and optional HTTP/database integration checks |
+| `public/assets/`, `public/docs/` | Images, videos, branding, rulebook, and committee PDFs |
 
-Committee levels and seat counts are pending confirmation.
+MongoDB transactions are used for coordinated admin updates. Use a MongoDB deployment that
+supports transactions (normally a replica set or compatible managed cluster), including for
+local development if exercising those workflows.
 
-## Application status
+## Routes and APIs
 
-Applicants sign in with the email used for registration and their application ID. The portal tracks these stages:
+### Pages
 
-1. **Submitted** — Registration received.
-2. **Payment under review** — Payment is being reviewed.
-3. **Payment confirmed** — Delegate is confirmed; committee allocation follows within 1–3 business days.
-4. **Committee allocated** — Committee and country/portfolio assignment are available.
+| URL | Purpose |
+| --- | --- |
+| `/` | Event home |
+| `/committees` | Committee information and available guides |
+| `/register` | Solo/delegation registration |
+| `/portal` | Applicant status lookup and requested receipt replacement |
+| `/archive` | General event and committee documents |
+| `/admin` | Authenticated organiser dashboard |
 
-The portal also supports the special **Action required** state (for example, an unclear payment receipt that needs replacement) and **Waitlisted** state. For delegations, the head delegate can view each delegate's individual committee, portfolio, and status.
+### API surface
 
-## Website sections
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /api/register` | Validate and create a registration and store its payment receipt |
+| `POST /api/status` | Look up an application with email and application ID |
+| `POST /api/status/receipt` | Submit a replacement receipt when requested |
+| `GET /api/committees` | Return active/public committee information |
+| `/api/admin/login`, `/logout`, `/me` | Admin session lifecycle |
+| `/api/admin/overview` | Admin dashboard data |
+| `/api/admin/applications` and `/[applicationId]` | Search applications and inspect/update records |
+| `/api/admin/payments/[applicationId]/confirm` and `/reject` | Review payment status |
+| `/api/admin/receipts/[fileId]`, `/api/admin/payments/[applicationId]/reanalyze`, `/api/admin/receipts/check-pending` | Secure receipt access and analysis |
+| `/api/admin/committees` and `/[code]` | Create, list, edit, and remove/deactivate committees |
+| `/api/admin/delegates/[id]/allocate` and `/waitlist` | Allocate, remove, or waitlist a delegate |
+| `/api/admin/export` | Export admin data as CSV |
+| `GET /api/admin/audit` | View the 100 most recent admin mutation audit records |
 
-- **Home:** Event introduction, countdown to 18 November 2026 at 8:00 AM Pakistan Standard Time, registration status, event details, committee teaser, how it works, and FAQs.
-- **Committees:** Committee details, preferences guidance, and study-guide availability.
-- **Register:** Solo and delegation forms, payment total, receipt upload, and confirmation with application ID.
-- **Portal:** Application lookup and status tracker.
-- **Archive:** General resources (rules of procedure, position-paper guide, and MUN introduction) and committee folders with study guides and additional reading.
+Admin mutations require a valid server-side session and same-origin request checks. The admin
+session is an HttpOnly cookie backed by a revocable server-side session record. Removing an
+organiser from `ADMIN_USERS` or changing their password hash invalidates their existing
+sessions. Authorized admin mutations append actor, method, path and time to the audit log,
+available at `GET /api/admin/audit`.
 
-## Contact
+## Registration and payment workflow
 
-- WhatsApp: **0314 3552058**
-- Email: **tlc.khi@nu.edu.pk**
-- Instagram: **[@tgd_nuces](https://www.instagram.com/tgd_nuces)** (The Grand Debate) and **[@tlc_nu](https://www.instagram.com/tlc_nu/)** (TLC)
+1. A solo delegate or delegation submits its details, committee preferences, and one receipt.
+2. The server validates the payload and computes the applicable fee; it stores the receipt in
+   GridFS and records the application, delegates, and payment.
+3. Organisers inspect the payment in `/admin`. They can confirm it or request a replacement
+   receipt; the applicant can check their status using their email and application ID.
+4. After confirmation, organisers allocate committees and country/portfolio assignments.
+5. Applicants see application/payment and delegate allocation states in the portal.
 
-## Development
+The public fee schedule in the current project is PKR 2,000 per delegate for the early-bird
+window (through 7 November 2026) and PKR 2,400 for the regular window (8–15 November 2026).
+Registration closes from 16 November 2026. Check `src/lib/pricing.ts` and `src/data/event.ts`
+before changing or announcing these values.
 
-This project uses Next.js, TypeScript, and MongoDB with Mongoose.
+## Environment variables
+
+Copy `.env.example` to `.env.local` for local development and replace placeholders. Never
+commit `.env.local`, real credentials, or production secrets.
+
+### Runtime configuration
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `MONGODB_URI` | Yes for database features | MongoDB connection URI. Needed by registration, status, admin, receipt storage, and seeding. |
+| `ADMIN_USERS` | Yes for admin sign-in | JSON array of organiser objects with `userId`, `name`, and a `passwordHash` generated by `npm run admin:hash -- '<password>'`. Passwords must be at least 8 characters; use 12 or more when possible. |
+| `RECEIPT_AI_KEY` | Optional | API key for an OpenAI-compatible receipt vision endpoint. |
+| `RECEIPT_AI_MODEL` | Optional | Vision-capable model name. AI analysis is enabled only when both this and the key are set. |
+| `RECEIPT_AI_BASE_URL` | Optional | OpenAI-compatible API base URL; defaults to Google's Gemini OpenAI-compatible endpoint. |
+
+If AI receipt review is enabled, receipt data is sent to the configured third-party API.
+Confirm the provider, data handling, and applicable privacy requirements before enabling it.
+Without the two required AI settings, receipt AI review is disabled; manual organiser review
+remains the decision-maker.
+
+When storing `ADMIN_USERS` in `.env.local`, escape the two `$` characters in each scrypt hash
+as `\$`; Next.js expands unescaped `$` references while loading dotenv files. Deployment
+secret managers should receive the normal unescaped hash value.
+
+Next.js also manages `NODE_ENV`. The deployment platform may set `PORT`; neither is a
+project-specific secret. There are no `NEXT_PUBLIC_*` variables currently required.
+
+### Test-only settings
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `API_BASE_URL` | `http://localhost:3000` | Base URL used by `npm run test:api` for HTTP checks. |
+| `TEST_STATUS_EMAIL` | Seed solo demo email | Email used by optional database-backed status checks. |
+| `TEST_STATUS_APPLICATION_ID` | Seed solo demo ID | Application ID used by optional database-backed status checks. |
+| `RUN_WRITE_TESTS` | unset | Set to `1` only to opt in to registration write tests. |
+| `ALLOW_REMOTE_WRITE_TESTS` | unset | Must be set to `1` to permit opted-in write tests against a non-local host. Do not use against production. |
+| `RUN_ADMIN_CRUD_TESTS` | unset | Set to `1` to opt in to database-mutating admin CRUD checks. Requires dedicated development-only `TEST_ADMIN_USER_ID` and `TEST_ADMIN_PASSWORD`. |
+| `TEST_ADMIN_USER_ID` / `TEST_ADMIN_PASSWORD` | unset | Development-only admin credentials for the opt-in admin CRUD check. Never use production accounts. |
+
+The test script may make HTTP requests to the configured API. Do not point it at production.
+The seed script upserts fixed demo records; run it only against a development database.
+
+## Local development
+
+Prerequisites: a Node.js version supported by the installed Next.js 16 release, npm, and a
+MongoDB database for database-backed workflows.
 
 ```bash
 npm install
+cp .env.example .env.local
+# Edit .env.local with a development MONGODB_URI and individual ADMIN_USERS.
 npm run dev
 ```
 
-Set `MONGODB_URI` in `.env.local` before using database-backed features. Other available commands are:
+Open `http://localhost:3000`. Public pages can be explored without database credentials, but
+registration, applicant lookup, and admin data operations need MongoDB. Admin login also
+requires an `ADMIN_USERS` entry for each organiser.
 
-```bash
-npm run lint
-npm run build
-npm start
-```
+### Commands
 
-## Items awaiting confirmation
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the Next.js development server |
+| `npm run lint` | Run ESLint |
+| `npm run build` | Create a production build |
+| `npm run admin:hash -- '<password>'` | Generate an scrypt password hash for one `ADMIN_USERS` entry |
+| `npm start` | Serve the completed build |
+| `npm run seed` | Upsert development committees and demo applications |
+| `npm run test:api` | Run validation checks and available HTTP integration checks |
+| `npm run email:smoke` | Send two synthetic registration emails through Google SMTP |
 
-- Payment account title and transfer details.
-- Committee agendas, levels, and seat counts.
-- Sponsor announcement.
-- Study guides and archive documents as they become available.
+### Transactional email
+
+The app sends registration, receipt, payment-review, allocation, and waitlist updates through Google SMTP using Nodemailer OAuth2. The TLC Workspace account does not allow App Passwords, so the server uses a refresh token authorized by `tlc.khi@nu.edu.pk`. Configure these environment variables locally and in the production deployment:
+
+| Variable | Purpose |
+| --- | --- |
+| `GOOGLE_SMTP_USER` | Google mailbox used to authenticate and send, for example `tlc.khi@nu.edu.pk`. |
+| `GOOGLE_OAUTH_CLIENT_ID` | OAuth client ID from the Google Cloud project. |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | OAuth client secret. Keep this secret. |
+| `GOOGLE_OAUTH_REFRESH_TOKEN` | Refresh token granted by the sending mailbox. Keep this secret. |
+| `GOOGLE_SMTP_HOST` | Optional; defaults to `smtp.gmail.com`. |
+| `GOOGLE_SMTP_PORT` | Optional; `465` (SSL, default) or `587` (STARTTLS). |
+| `GOOGLE_SMTP_FROM` | Optional approved sender alias; defaults to `GOOGLE_SMTP_USER`. |
+| `TGD_SITE_URL` | Public site origin, used to build the application-portal link in emails. |
+
+#### Generating the OAuth credentials
+
+1. In Google Cloud Console, create a project under the `nu.edu.pk` organization and enable the **Gmail API**.
+2. In Google Auth Platform, set the audience to **Internal**. Internal apps are limited to accounts in the Workspace organization. For an External app, publish it to Production; External apps left in Testing can have refresh tokens that expire after 7 days for non-basic scopes. [Google OAuth refresh-token rules](https://developers.google.com/identity/protocols/oauth2).
+3. Create a **Web application** OAuth client and add `https://developers.google.com/oauthplayground` as an authorized redirect URI.
+4. Open [OAuth Playground](https://developers.google.com/oauthplayground), select **Use your own OAuth credentials**, enter the client ID and secret, and use Offline access.
+5. Authorize `https://mail.google.com/` as the sending mailbox, exchange the authorization code for tokens, and save the refresh token in `GOOGLE_OAUTH_REFRESH_TOKEN`.
+
+SMTP XOAUTH2 requires the `https://mail.google.com/` scope. This is a restricted, broad Gmail scope that permits reading, composing, sending, and permanently deleting mail; authorize it only if the mailbox owner and Workspace policy approve that access. If that permission is too broad, use the Gmail API with its narrower `gmail.send` scope instead of SMTP. [Google SMTP OAuth scope](https://developers.google.com/workspace/gmail/imap/xoauth2-protocol), [Gmail API scope descriptions](https://developers.google.com/workspace/gmail/api/auth/scopes).
+
+Keep the client secret and refresh token in `.env.local` and the production secret store only; never commit or paste them into chat. To rotate the client secret, add a new secret in Google Cloud Console, update `GOOGLE_OAUTH_CLIENT_SECRET`, confirm sending works, then disable the old secret. Google can invalidate refresh tokens if the user revokes access, the token is unused for 6 months, or the mailbox password changes when Gmail scopes are granted. OAuth clients inactive for 6 months are also automatically deleted. An `invalid_grant` error requires fresh user consent and a new refresh token. An `EAUTH` SMTP error usually points to incorrect credentials or whitespace in an environment value. [Refresh-token expiration](https://developers.google.com/identity/protocols/oauth2), [OAuth client inactivity](https://support.google.com/cloud/answer/15549257).
+
+Google requires secure TLS for SMTP. Gmail also recommends SPF, DKIM, and DMARC for sender-domain authentication and inbox placement; FAST IT manages those records for the university domain. See [Gmail sender guidelines](https://support.google.com/mail/answer/81126). Workspace SMTP relay (`smtp-relay.gmail.com`) is another option, but it requires FAST IT to configure relay policy and is not the current transport.
+
+Email delivery is scheduled after successful API operations and has finite SMTP timeouts. If SMTP credentials are absent or Google rejects a message, the registration/payment operation still succeeds and the server logs the send failure. The app does not yet keep a durable email retry queue.
+
+Run `npm run email:smoke` locally to send two synthetic confirmation emails through the real mailer: a four-delegate delegation example to `ismailsilat7@gmail.com` and a solo example to `k240546@nu.edu.pk`. It uses clearly marked `TGD-TEST-*` application IDs, does not create MongoDB records, and is disabled when `NODE_ENV=production`. Check each inbox and spam/junk folder, plus the terminal output for delivery status.
+
+`npm run test:api` skips HTTP/database-backed checks when no local API/database is available.
+Some checks read or write the fixed demo records when enabled and a database is reachable.
+Keep `RUN_WRITE_TESTS` unset for routine checks and never use production data for testing.
+
+## Deployment
+
+The production GitHub Actions workflow at `.github/workflows/deploy-production.yml` deploys
+this full-stack Next.js app to Vercel when `main` is updated, or when started manually from
+Actions. The frontend pages and `/api/*` Route Handlers ship together as one Vercel project;
+no separate backend deployment is needed. This must run as a server app, not a static site.
+
+### Connect GitHub Actions and Vercel
+
+1. Install/use the Vercel CLI, then switch to the TLC Vercel account: `vercel logout`,
+   `vercel login`, and confirm the account with `vercel whoami`.
+2. From the repository root, run `vercel link` and select the TLC team and the existing
+   project, or create a project for this app. Keep the project root as `.`. The link writes
+   `.vercel/project.json`, which is ignored by Git and contains the organization and project
+   IDs needed by the workflow.
+3. In the GitHub repository, open **Settings → Environments → New environment**, create
+   `production`, and add these environment secrets:
+   `VERCEL_TOKEN` (create a token while signed in to the TLC account), `VERCEL_ORG_ID`, and
+   `VERCEL_PROJECT_ID`. Read the two IDs from `.vercel/project.json`; do not commit that file
+   or put token values in the repository. The workflow uses the `production` GitHub
+   Environment, so configure secrets there.
+4. Add the app's runtime variables to the Vercel project's **Settings → Environment Variables**
+   for Production. At minimum configure `MONGODB_URI` and `ADMIN_USERS`; add the Google SMTP
+   values if email notifications should be enabled, and the receipt AI key/model only if that
+   optional feature is approved. Vercel runtime variables and GitHub Actions secrets are
+   separate stores: the workflow secrets authenticate deployment, while the Vercel variables
+   configure the deployed app. Do not commit `.env.local` or any secret.
+5. Run **Actions → Production Deployment → Run workflow** once to validate the setup. Later
+   pushes to `main` deploy automatically. Vercel Git integration can also deploy pushes on its
+   own; disable its automatic production deployment if you want GitHub Actions to be the sole
+   deployment path.
+
+The workflow builds a Vercel production artifact in GitHub Actions and uploads that prebuilt
+artifact to Vercel. The Vercel project still hosts both the website and its server-side API
+routes. Ensure the MongoDB deployment supports transactions, allows Vercel connections, and
+has backups; verify receipt processing and other runtime limits on the deployed project.
+
+Before deployment:
+
+1. Provision MongoDB with transaction support and configure network access, least-privilege
+   credentials, backups, and an appropriate database name.
+2. Set `MONGODB_URI` and `ADMIN_USERS` in Vercel's Production environment variables. Give every organiser
+   an individual account and revoke access by removing that account and revoking its sessions.
+   Add the AI
+   variables only if that feature has been approved.
+3. Confirm that the runtime can execute receipt processing (including the traced Tesseract.js
+   worker, WASM, and language data). Receipt upload processing should be checked against the
+   target host's request/body and execution-time limits.
+4. Ensure public assets and all PDFs in `public/docs/` are included. The `studyGuideUrl`
+   stored for a public file uses its web path, for example
+   `/docs/committees/unsc-study-guide.pdf`—not the local `public/` filesystem prefix.
+5. Run `npm run lint` and `npm run build` in the deployment environment. `next/font/google`
+   downloads the configured fonts during the build, so build access to Google Fonts (or a
+   previously available font cache) may be needed.
+6. Verify admin login, a development registration, status lookup, receipt upload/retrieval,
+   payment review, allocation, and CSV export against a non-production deployment.
+7. Configure monitoring, database backups, and data-retention/access policies. Set the Google
+   OAuth SMTP secrets and verify a test delivery before relying on email notifications.
+
+Use `npm start` to run the built app on a Node host. Configure custom domains, TLS, health
+monitoring, and platform-specific runtime limits in the hosting provider. Do not run the seed
+script against a production database.
+
+## Event contacts
+
+- WhatsApp: **0314 3552058**
+- Email: **tlc.khi@nu.edu.pk**
+- Instagram: [@tgd_nuces](https://www.instagram.com/tgd_nuces) and
+  [@tlc_nu](https://www.instagram.com/tlc_nu/)
+
+## Related documentation
+
+- [`src/README.md`](./src/README.md) — frontend/source-level notes.
+- [`AGENTS.md`](./AGENTS.md) — repository-specific development instructions.
