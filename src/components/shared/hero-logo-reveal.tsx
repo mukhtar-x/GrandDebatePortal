@@ -1,12 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { useContext, useEffect, useState } from "react";
 import { IntroFinishedContext } from "@/components/shared/site-intro-context";
 
 const LOGO_REVEAL_VIDEO = "/assets/05_Videos/tgd_logo_reveal_1080p_optimized.mp4";
 const MOBILE_LOGO_REVEAL_VIDEO = "/assets/05_Videos/tgd_logo_reveal_mobile_720p.mp4";
-const VIDEO_POSTER = "/assets/05_Videos/video_poster_frame.jpg";
 
 export function HeroLogoReveal() {
   const [shouldAnimate, setShouldAnimate] = useState(false);
@@ -23,17 +21,7 @@ export function HeroLogoReveal() {
     return () => reduceMotion.removeEventListener("change", updateMotionPreference);
   }, [introFinished]);
 
-  if (!shouldAnimate) {
-    return (
-      <Image
-        className="home-reveal"
-        src={VIDEO_POSTER}
-        alt=""
-        width={1920}
-        height={1080}
-      />
-    );
-  }
+  if (!shouldAnimate) return null;
 
   return (
     <video
@@ -41,8 +29,7 @@ export function HeroLogoReveal() {
       autoPlay
       muted
       playsInline
-      preload="none"
-      poster={VIDEO_POSTER}
+      preload="auto"
       aria-hidden="true"
     >
       <source
