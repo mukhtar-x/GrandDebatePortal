@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { InputField } from "@/components/ui/form-fields";
+import { ActionIcon } from "@/components/shared/action-icon";
 import {
   lookupApplication,
   resubmitReceipt,
@@ -140,7 +141,7 @@ export function PortalLookup() {
             disabled={loading}
             aria-busy={loading}
           >
-            {loading ? "Checking…" : "Check Status"} <span aria-hidden="true">→</span>
+            {loading ? "Checking…" : "Check Status"} <ActionIcon />
           </button>
         </form>
         <p className="lookup-help">

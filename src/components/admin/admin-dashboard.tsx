@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { ActionIcon } from "@/components/shared/action-icon";
 
 type PaymentStatus = "Pending" | "Confirmed" | "Action Required";
 
@@ -584,7 +585,7 @@ export default function AdminDashboard() {
             <div className="admin-content">
                 <section className="admin-heading">
                     <div><p className="admin-eyebrow">Conference administration</p><h1>Welcome back, {sessionName}</h1><p className="admin-muted">Review applications, confirm payments and manage committee placements.</p></div>
-                    <button className="admin-button admin-button-outline" type="button" onClick={() => void loadDashboard()} disabled={loading}>{loading ? "Refreshing…" : "↻ Refresh data"}</button>
+                    <button className="admin-button admin-button-outline" type="button" onClick={() => void loadDashboard()} disabled={loading}>{loading ? "Refreshing…" : <>Refresh data <ActionIcon direction="refresh" /></>}</button>
                 </section>
 
                 <section className="admin-metrics" aria-label="Conference metrics">
@@ -821,7 +822,7 @@ function ReceiptPreview({ fileId, applicationId }: { fileId: string; application
                 alt={`Uploaded payment receipt for ${applicationId}`}
                 onError={() => setFailed(true)}
             />
-            <span>Open full-size receipt ↗</span>
+            <span>Open full-size receipt <ActionIcon direction="up-right" /></span>
         </a>
     );
 }
@@ -888,7 +889,7 @@ function CommitteeCard({
             <h3>{committee.name}</h3><p className="admin-muted">{committee.agenda || "Agenda to be announced"}</p>
             <div className="admin-seat-label"><strong>{committee.allocatedSeats}</strong><span>/ {committee.totalSeats > 0 ? committee.totalSeats : "Unlimited"} seats allocated</span></div>
             <div className="admin-progress" role="progressbar" aria-label={`${committee.code} seats allocated`} aria-valuenow={committee.allocatedSeats} aria-valuemin={0} aria-valuemax={committee.totalSeats || Math.max(committee.allocatedSeats, 1)}><span style={{ width: `${committee.totalSeats > 0 ? progress : committee.allocatedSeats > 0 ? 100 : 0}%` }} /></div>
-            {committee.studyGuideUrl && <a className="admin-guide-link" href={committee.studyGuideUrl} target="_blank" rel="noreferrer">Study guide ↗</a>}
+            {committee.studyGuideUrl && <a className="admin-guide-link" href={committee.studyGuideUrl} target="_blank" rel="noreferrer">Study guide <ActionIcon direction="up-right" /></a>}
             {full && <p className="admin-full-note">Capacity reached</p>}
             <button className="admin-button admin-button-small admin-button-outline admin-committee-edit-button" type="button" onClick={() => setEditing(true)}>Edit committee</button>
         </>}

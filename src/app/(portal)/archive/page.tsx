@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { COMMITTEE_DETAILS } from "@/data/committee-details";
+import { ActionIcon } from "@/components/shared/action-icon";
 
 export const metadata: Metadata = {
   title: "Document archive · The Grand Debate '26",
@@ -97,7 +98,7 @@ export default function ArchivePage() {
             <h2 id="archive-committee-title">Committee materials</h2>
           </div>
           <Link className="archive-browse-link" href="/committees">
-            Browse committees <span aria-hidden="true">→</span>
+            Browse committees <ActionIcon />
           </Link>
         </div>
         <div className="archive-folder-list">

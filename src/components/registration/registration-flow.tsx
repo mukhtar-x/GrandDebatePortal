@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ActionIcon } from "@/components/shared/action-icon";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { DelegationFields } from "@/components/registration/delegation-fields";
 import { PaymentSection } from "@/components/registration/payment-section";
@@ -255,7 +256,7 @@ export function RegistrationFlow() {
         </div>
         <div className="confirmation-actions">
           <Link className="button button-primary" href="/portal">
-            Go to Portal <span aria-hidden="true">→</span>
+            Go to Portal <ActionIcon />
           </Link>
           <button className="button button-quiet" type="button" onClick={startNewRegistration}>
             Register someone else
@@ -275,7 +276,7 @@ export function RegistrationFlow() {
         <h2>Thank you for your interest.</h2>
         <p>{registrationWindow.description}</p>
         <Link className="button button-primary" href="/portal">
-          Go to Portal <span aria-hidden="true">→</span>
+          Go to Portal <ActionIcon />
         </Link>
       </section>
     );
@@ -408,7 +409,7 @@ export function RegistrationFlow() {
             aria-busy={submitting}
           >
             {submitting ? "Submitting…" : "Submit Registration"}{" "}
-            <span aria-hidden="true">→</span>
+            <ActionIcon />
           </button>
           <p className="submit-footnote">
             By submitting this form, you confirm that the information provided is accurate.

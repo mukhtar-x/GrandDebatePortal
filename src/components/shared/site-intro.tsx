@@ -9,6 +9,7 @@ import {
 } from "react";
 import { usePathname } from "next/navigation";
 import { IntroFinishedContext } from "@/components/shared/site-intro-context";
+import { ActionIcon } from "@/components/shared/action-icon";
 
 const INTRO_VIDEO = "/assets/05_Videos/tgd_intro_3d_cinematic_720p_muted_for_autoplay.mp4";
 const VIDEO_POSTER = "/assets/05_Videos/video_poster_frame.jpg";
@@ -93,7 +94,7 @@ function SiteIntro({ onFinished }: { onFinished: () => void }) {
       </video>
       <div className="site-intro-vignette" />
       <button className="site-intro-skip" type="button" onClick={dismiss}>
-        Skip intro <span aria-hidden="true">→</span>
+        Skip intro <ActionIcon />
       </button>
     </div>
   );

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ActionIcon } from "@/components/shared/action-icon";
 import Image from "next/image";
 import { COMMITTEE_DETAILS } from "@/data/committee-details";
 
@@ -71,7 +72,7 @@ export default function CommitteesPage() {
               target="_blank"
               rel="noreferrer"
             >
-              Study guide · PDF <span aria-hidden="true">↓</span>
+              Study guide · PDF <ActionIcon direction="down" />
             </a>
           </article>
         ))}

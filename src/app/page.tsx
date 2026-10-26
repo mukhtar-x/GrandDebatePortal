@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ActionIcon } from "@/components/shared/action-icon";
 import { HeroLogoReveal } from "@/components/shared/hero-logo-reveal";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { SiteHeader } from "@/components/shared/site-header";
@@ -23,7 +24,7 @@ export default function Home() {
 
             <div className="home-actions">
               <Link className="button button-primary" href="/register">
-                Register for the conference <span aria-hidden="true">↗</span>
+                Register for the conference <ActionIcon direction="up-right" />
               </Link>
               <Link className="button button-secondary" href="/portal">
                 Track an application
@@ -60,7 +61,7 @@ export default function Home() {
               <span className="home-card-copy">
                 Register as a solo delegate or bring a delegation of 4–7 students.
               </span>
-              <span className="home-card-link">Explore registration <span aria-hidden="true">→</span></span>
+              <span className="home-card-link">Explore registration <ActionIcon /></span>
             </Link>
             <Link className="home-action-card" href="/portal">
               <span className="home-card-number">02</span>
@@ -68,7 +69,7 @@ export default function Home() {
               <span className="home-card-copy">
                 Look up an existing application and follow its review progress.
               </span>
-              <span className="home-card-link">Open application portal <span aria-hidden="true">→</span></span>
+              <span className="home-card-link">Open application portal <ActionIcon /></span>
             </Link>
           </div>
         </section>
