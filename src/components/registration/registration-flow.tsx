@@ -285,11 +285,6 @@ export function RegistrationFlow() {
   return (
     <div className="registration-layout">
       <form className="registration-form" onSubmit={handleSubmit}>
-        <div className="registration-state-banner" role="status">
-          <span className="eyebrow-dot" />
-          <span>{registrationWindow.description}</span>
-        </div>
-
         <section className="form-card">
           <div className="form-card-heading">
             <div className="section-heading-icon">01</div>

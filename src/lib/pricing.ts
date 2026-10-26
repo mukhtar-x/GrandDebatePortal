@@ -1,10 +1,15 @@
-import { MAX_DELEGATION_SIZE, MIN_DELEGATION_SIZE } from "@/data/event";
+import {
+    EARLY_BIRD_ENDS_AT,
+    MAX_DELEGATION_SIZE,
+    MIN_DELEGATION_SIZE,
+    REGISTRATION_ENDS_AT,
+} from "@/data/event";
 
 export const EARLY_BIRD_PRICE = 2000;
 export const REGULAR_PRICE = 2400;
-export const REGULAR_RATE_START = new Date("2026-11-08T00:00:00.000+05:00");
+export const REGULAR_RATE_START = new Date(EARLY_BIRD_ENDS_AT);
 export const EARLY_BIRD_DEADLINE = new Date(REGULAR_RATE_START.getTime() - 1);
-export const REGISTRATION_CLOSED_AT = new Date("2026-11-16T00:00:00.000+05:00");
+export const REGISTRATION_CLOSED_AT = new Date(REGISTRATION_ENDS_AT);
 
 export interface Pricing {
     totalPayable: number;

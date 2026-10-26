@@ -11,6 +11,10 @@ export const EVENT_DETAILS = {
 export const MIN_DELEGATION_SIZE = 4;
 export const MAX_DELEGATION_SIZE = 7;
 
+// Registration cutoffs use Pakistan time and are shared by pricing and the UI.
+export const EARLY_BIRD_ENDS_AT = "2026-11-08T00:00:00+05:00";
+export const REGISTRATION_ENDS_AT = "2026-11-16T00:00:00+05:00";
+
 export const COMMITTEES = [
   { code: "UNSC", name: "United Nations Security Council" },
   { code: "DISEC", name: "Disarmament and International Security Committee" },
@@ -64,19 +68,8 @@ export type RegistrationWindow =
 export const CURRENT_REGISTRATION_WINDOW = EARLY_BIRD_WINDOW;
 
 export function getCurrentRegistrationWindow(now = new Date()): RegistrationWindow {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Karachi",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(now);
-  const year = parts.find((part) => part.type === "year")?.value ?? "";
-  const month = parts.find((part) => part.type === "month")?.value ?? "";
-  const day = parts.find((part) => part.type === "day")?.value ?? "";
-  const dateKey = year + "-" + month + "-" + day;
-
-  if (dateKey <= "2026-11-07") return EARLY_BIRD_WINDOW;
-  if (dateKey <= "2026-11-15") return REGULAR_WINDOW;
+  if (now < new Date(EARLY_BIRD_ENDS_AT)) return EARLY_BIRD_WINDOW;
+  if (now < new Date(REGISTRATION_ENDS_AT)) return REGULAR_WINDOW;
   return CLOSED_WINDOW;
 }
 

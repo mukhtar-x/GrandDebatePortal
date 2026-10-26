@@ -44,17 +44,19 @@ export default function RegisterPage() {
                 <span className="eyebrow-dot" />
                 Registration open · School &amp; university delegates
             </div>
-            <div className="page-heading">
-                <p className="section-overline">18–20 November 2026 · Karachi</p>
-                <h1>Register for The Grand Debate &apos;26</h1>
-                <p className="page-intro">
-                    Join three days of debate, diplomacy and dialogue. Choose your registration type,
-                    add your delegate details, then review the payment information.
-                </p>
+            <div className="registration-intro-group">
+                <div className="page-heading">
+                    <p className="section-overline">18–20 November 2026 · Karachi</p>
+                    <h1>Register for The Grand Debate &apos;26</h1>
+                    <p className="page-intro">
+                        Join three days of debate, diplomacy and dialogue. Choose your registration type,
+                        add your delegate details, then review the payment information.
+                    </p>
+                </div>
+                <RegistrationCountdown />
             </div>
 
             <EventInfoStrip />
-            <RegistrationCountdown />
             <RegistrationFlow />
         </div>
     );
