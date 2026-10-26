@@ -1,3 +1,5 @@
+import { MIN_DELEGATION_SIZE } from "@/data/event";
+
 export type RegistrationType = "solo" | "delegation";
 
 export interface SoloFormValues {
@@ -44,12 +46,12 @@ export function emptyDelegate(): DelegateFormValues {
 export function emptyDelegation(): DelegationFormValues {
   return {
     institution: "",
-    size: 4,
+    size: MIN_DELEGATION_SIZE,
     headName: "",
     headEmail: "",
     headWhatsapp: "",
     headIsDelegate: false,
-    delegates: Array.from({ length: 4 }, emptyDelegate),
+    delegates: Array.from({ length: MIN_DELEGATION_SIZE }, emptyDelegate),
   };
 }
 

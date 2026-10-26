@@ -150,28 +150,6 @@ export function PortalLookup() {
         </p>
       </section>
 
-      <aside className="portal-aside">
-        <section className="sidebar-card portal-aside-card">
-          <p className="section-overline">What happens next</p>
-          <h2>One clear step at a time.</h2>
-          <p>
-            We review each payment, then allocate delegates to a committee within 1 to 3
-            business days of confirmation.
-          </p>
-          <div className="mini-timeline">
-            <span className="mini-timeline-line" />
-            <span className="mini-timeline-step is-complete">1</span>
-            <span className="mini-timeline-step">2</span>
-            <span className="mini-timeline-step">3</span>
-            <span className="mini-timeline-step">4</span>
-          </div>
-          <div className="mini-timeline-labels">
-            <span>Submitted</span>
-            <span>Committee</span>
-          </div>
-        </section>
-      </aside>
-
       {signedIn ? (
         <ApplicationStatusView
           key={signedIn.application.applicationId}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type ActiveRoute = "home" | "committees" | "register" | "portal" | "archive" | null;
 
@@ -20,7 +20,9 @@ function navLinkClass(key: string, active: ActiveRoute) {
 
 export function SiteNavigation() {
   const pathname = usePathname();
-  const mobileMenu = useRef<HTMLDetailsElement>(null);
+  const mobileMenu = useRef<HTMLDivElement>(null);
+  const mobileToggle = useRef<HTMLButtonElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
   const active: ActiveRoute =
     pathname === "/"
       ? "home"
@@ -34,9 +36,31 @@ export function SiteNavigation() {
               ? "archive"
               : null;
 
-  function closeMobileMenu() {
-    if (mobileMenu.current) mobileMenu.current.open = false;
-  }
+  useEffect(() => setIsOpen(false), [pathname]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (event.target instanceof Node && !mobileMenu.current?.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+        mobileToggle.current?.focus();
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
 
   return (
     <>
@@ -53,26 +77,40 @@ export function SiteNavigation() {
         ))}
       </nav>
 
-      <details className="mobile-nav" ref={mobileMenu}>
-        <summary aria-label="Site navigation">
+      <div className={isOpen ? "mobile-nav is-open" : "mobile-nav"} ref={mobileMenu}>
+        <button
+          className="mobile-nav-toggle"
+          ref={mobileToggle}
+          type="button"
+          aria-label={isOpen ? "Close site navigation" : "Open site navigation"}
+          aria-expanded={isOpen}
+          aria-controls="mobile-navigation-panel"
+          onClick={() => setIsOpen((open) => !open)}
+        >
           <span />
           <span />
           <span />
-        </summary>
-        <nav className="mobile-nav-panel" aria-label="Mobile navigation">
+        </button>
+        <nav
+          id="mobile-navigation-panel"
+          className="mobile-nav-panel"
+          aria-label="Mobile navigation"
+          aria-hidden={!isOpen}
+          inert={!isOpen}
+        >
           {navigation.map((item) => (
             <Link
               key={item.key}
               className={navLinkClass(item.key, active)}
               href={item.href}
               aria-current={item.key === active ? "page" : undefined}
-              onClick={closeMobileMenu}
+              onClick={() => setIsOpen(false)}
             >
               {item.label}
             </Link>
           ))}
         </nav>
-      </details>
+      </div>
     </>
   );
 }

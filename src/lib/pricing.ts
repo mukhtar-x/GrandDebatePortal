@@ -1,3 +1,5 @@
+import { MAX_DELEGATION_SIZE, MIN_DELEGATION_SIZE } from "@/data/event";
+
 export const EARLY_BIRD_PRICE = 2000;
 export const REGULAR_PRICE = 2400;
 export const REGULAR_RATE_START = new Date("2026-11-08T00:00:00.000+05:00");
@@ -17,7 +19,8 @@ export type PricingResult =
 export function calculatePricing(delegateCount: number, date = new Date()): PricingResult {
     const validCount =
         Number.isInteger(delegateCount) &&
-        (delegateCount === 1 || (delegateCount >= 4 && delegateCount <= 7));
+        (delegateCount === 1 ||
+            (delegateCount >= MIN_DELEGATION_SIZE && delegateCount <= MAX_DELEGATION_SIZE));
     if (!validCount || Number.isNaN(date.getTime())) {
         return {
             success: false,

@@ -17,6 +17,8 @@ import {
 import {
   CURRENT_REGISTRATION_WINDOW,
   EVENT_DETAILS,
+  MAX_DELEGATION_SIZE,
+  MIN_DELEGATION_SIZE,
   formatPKR,
   getCurrentRegistrationWindow,
   type RegistrationWindow,
@@ -31,6 +33,49 @@ function newIdempotencyKey() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
+function FeeSummary({
+  registrationType,
+  delegateCount,
+  registrationWindow,
+  total,
+}: {
+  registrationType: RegistrationType;
+  delegateCount: number;
+  registrationWindow: RegistrationWindow;
+  total: number;
+}) {
+  return (
+    <section className="summary-card">
+      <div className="summary-card-top">
+        <span className="summary-icon" aria-hidden="true">✦</span>
+        <div>
+          <p className="section-overline">Your registration</p>
+          <h2>Fee summary</h2>
+        </div>
+      </div>
+      <div className="summary-line">
+        <span>Registration type</span>
+        <strong>{registrationType === "solo" ? "Solo delegate" : "Delegation"}</strong>
+      </div>
+      <div className="summary-line">
+        <span>Delegates</span>
+        <strong>{delegateCount}</strong>
+      </div>
+      <div className="summary-line">
+        <span>{registrationWindow.name} rate</span>
+        <strong>{formatPKR(registrationWindow.feePerDelegate)} each</strong>
+      </div>
+      <div className="summary-total">
+        <span>Total payable</span>
+        <strong aria-live="polite" aria-atomic="true">{formatPKR(total)}</strong>
+      </div>
+      <p className="summary-deadline">
+        Rate available until {registrationWindow.deadline}.
+      </p>
+    </section>
+  );
 }
 
 export function RegistrationFlow() {
@@ -83,9 +128,16 @@ export function RegistrationFlow() {
 
   function handleDelegationSizeChange(size: number) {
     setDelegation((current) => {
-      const delegates = current.delegates.slice(0, size);
-      while (delegates.length < size) delegates.push(emptyDelegate());
-      return { ...current, size, delegates };
+      const safeSize = Math.max(
+        MIN_DELEGATION_SIZE,
+        Math.min(
+          MAX_DELEGATION_SIZE,
+          Number.isFinite(size) ? Math.trunc(size) : MIN_DELEGATION_SIZE,
+        ),
+      );
+      const delegates = current.delegates.slice(0, safeSize);
+      while (delegates.length < safeSize) delegates.push(emptyDelegate());
+      return { ...current, size: safeSize, delegates };
     });
   }
 
@@ -111,6 +163,26 @@ export function RegistrationFlow() {
       const delegates = [...current.delegates];
       delegates[index] = { ...delegates[index], [field]: value };
       return { ...current, delegates };
+    });
+  }
+
+  function handleRemoveDelegate(index: number) {
+    setDelegation((current) => {
+      if (
+        current.delegates.length <= MIN_DELEGATION_SIZE ||
+        index < 0 ||
+        index >= current.delegates.length
+      ) {
+        return current;
+      }
+
+      const delegates = current.delegates.filter((_, delegateIndex) => delegateIndex !== index);
+      return {
+        ...current,
+        delegates,
+        size: delegates.length,
+        headIsDelegate: index === 0 ? false : current.headIsDelegate,
+      };
     });
   }
 
@@ -259,11 +331,11 @@ export function RegistrationFlow() {
               onClick={() => setRegistrationType("delegation")}
             >
               <span className="type-card-icon" aria-hidden="true">
-                04–07
+                {MIN_DELEGATION_SIZE}–{MAX_DELEGATION_SIZE}
               </span>
               <span className="type-card-title">Delegation</span>
               <span className="type-card-copy">
-                For 4 to 7 delegates from the same institution. One form and payment.
+                For {MIN_DELEGATION_SIZE} to {MAX_DELEGATION_SIZE} delegates from the same institution. One form and payment.
               </span>
               <span className="type-card-fee">
                 {formatPKR(registrationWindow.feePerDelegate)}{" "}
@@ -290,9 +362,19 @@ export function RegistrationFlow() {
               onSizeChange={handleDelegationSizeChange}
               onHeadIsDelegateChange={handleHeadIsDelegateChange}
               onDelegateChange={handleDelegateChange}
+              onRemoveDelegate={handleRemoveDelegate}
             />
           )}
         </section>
+
+        <div className="registration-mobile-summary">
+          <FeeSummary
+            registrationType={registrationType}
+            delegateCount={delegateCount}
+            registrationWindow={registrationWindow}
+            total={total}
+          />
+        </div>
 
         <PaymentSection
           delegateCount={delegateCount}
@@ -337,36 +419,14 @@ export function RegistrationFlow() {
       </form>
 
       <aside className="registration-sidebar">
-        <section className="summary-card">
-          <div className="summary-card-top">
-            <span className="summary-icon" aria-hidden="true">
-              ✦
-            </span>
-            <div>
-              <p className="section-overline">Your registration</p>
-              <h2>Fee summary</h2>
-            </div>
-          </div>
-          <div className="summary-line">
-            <span>Registration type</span>
-            <strong>{registrationType === "solo" ? "Solo delegate" : "Delegation"}</strong>
-          </div>
-          <div className="summary-line">
-            <span>Delegates</span>
-            <strong>{delegateCount}</strong>
-          </div>
-          <div className="summary-line">
-            <span>{registrationWindow.name} rate</span>
-            <strong>{formatPKR(registrationWindow.feePerDelegate)} each</strong>
-          </div>
-          <div className="summary-total">
-            <span>Total payable</span>
-            <strong>{formatPKR(total)}</strong>
-          </div>
-          <p className="summary-deadline">
-            Rate available until {registrationWindow.deadline}.
-          </p>
-        </section>
+        <div className="registration-desktop-summary">
+          <FeeSummary
+            registrationType={registrationType}
+            delegateCount={delegateCount}
+            registrationWindow={registrationWindow}
+            total={total}
+          />
+        </div>
 
         <section className="sidebar-card event-aside">
           <p className="section-overline">Conference details</p>

@@ -12,17 +12,41 @@ import { IntroFinishedContext } from "@/components/shared/site-intro-context";
 
 const INTRO_VIDEO = "/assets/05_Videos/tgd_intro_3d_cinematic_720p_muted_for_autoplay.mp4";
 const VIDEO_POSTER = "/assets/05_Videos/video_poster_frame.jpg";
+const INTRO_SEEN_KEY = "tgd-intro-seen-v1";
 
 export function SiteIntroProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [introFinished, setIntroFinished] = useState(false);
-  const finishIntro = useCallback(() => setIntroFinished(true), []);
+  const [introFinished, setIntroFinished] = useState(true);
+  const [showIntro, setShowIntro] = useState(false);
   const isAdminRoute = pathname === "/admin" || pathname?.startsWith("/admin/");
+
+  useEffect(() => {
+    if (isAdminRoute) return;
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    try {
+      if (localStorage.getItem(INTRO_SEEN_KEY) || reduceMotion.matches) return;
+    } catch {
+      // Storage can be unavailable in private browsing; the intro remains skippable.
+    }
+
+    setIntroFinished(false);
+    setShowIntro(true);
+  }, [isAdminRoute]);
+
+  const finishIntro = useCallback(() => {
+    setIntroFinished(true);
+    try {
+      localStorage.setItem(INTRO_SEEN_KEY, "1");
+    } catch {
+      // The intro still closes when persistent storage is unavailable.
+    }
+  }, []);
 
   return (
     <IntroFinishedContext.Provider value={introFinished}>
       {children}
-      {!isAdminRoute && <SiteIntro onFinished={finishIntro} />}
+      {showIntro && !isAdminRoute ? <SiteIntro onFinished={finishIntro} /> : null}
     </IntroFinishedContext.Provider>
   );
 }
@@ -37,27 +61,15 @@ function SiteIntro({ onFinished }: { onFinished: () => void }) {
     dismissed.current = true;
     setIsLeaving(true);
     onFinished();
-    window.setTimeout(() => setIsVisible(false), 650);
+    window.setTimeout(() => setIsVisible(false), 350);
   }, [onFinished]);
 
   useEffect(() => {
-    if (!isVisible) return;
-
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     if (reduceMotion.matches) {
       dismiss();
-      return;
     }
-
-    const previousOverflow = document.documentElement.style.overflow;
-    document.documentElement.style.overflow = "hidden";
-    const timeout = window.setTimeout(dismiss, 18_000);
-
-    return () => {
-      window.clearTimeout(timeout);
-      document.documentElement.style.overflow = previousOverflow;
-    };
-  }, [dismiss, isVisible]);
+  }, [dismiss]);
 
   if (!isVisible) return null;
 
@@ -71,7 +83,7 @@ function SiteIntro({ onFinished }: { onFinished: () => void }) {
         autoPlay
         muted
         playsInline
-        preload="auto"
+        preload="none"
         poster={VIDEO_POSTER}
         onEnded={dismiss}
         onError={dismiss}

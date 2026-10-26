@@ -1,4 +1,11 @@
-import { EXPERIENCE_OPTIONS } from "@/data/event";
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import {
+  EXPERIENCE_OPTIONS,
+  MAX_DELEGATION_SIZE,
+  MIN_DELEGATION_SIZE,
+} from "@/data/event";
 import { CommitteePreferences } from "@/components/registration/committee-preferences";
 import type {
   DelegateFormValues,
@@ -10,7 +17,10 @@ const experienceOptions = EXPERIENCE_OPTIONS.map((experience) => ({
   value: experience,
   label: experience,
 }));
-const sizeOptions = [4, 5, 6, 7].map((size) => ({
+const sizeOptions = Array.from(
+  { length: MAX_DELEGATION_SIZE - MIN_DELEGATION_SIZE + 1 },
+  (_, index) => MIN_DELEGATION_SIZE + index,
+).map((size) => ({
   value: String(size),
   label: size + " delegates",
 }));
@@ -25,6 +35,7 @@ interface DelegationFieldsProps {
     field: keyof DelegateFormValues,
     value: string,
   ) => void;
+  onRemoveDelegate: (index: number) => void;
 }
 
 export function DelegationFields({
@@ -33,7 +44,19 @@ export function DelegationFields({
   onSizeChange,
   onHeadIsDelegateChange,
   onDelegateChange,
+  onRemoveDelegate,
 }: DelegationFieldsProps) {
+  const focusDelegateIndex = useRef<number | null>(null);
+  const [announcement, setAnnouncement] = useState("");
+
+  useEffect(() => {
+    const index = focusDelegateIndex.current;
+    if (index === null) return;
+
+    document.getElementById(`delegate-${index}-name`)?.focus();
+    focusDelegateIndex.current = null;
+  }, [value.delegates.length]);
+
   return (
     <>
       <section className="form-subsection">
@@ -64,7 +87,7 @@ export function DelegationFields({
             options={sizeOptions}
             placeholder="Select delegation size"
             required
-            hint="Choose between 4 and 7 delegates."
+            hint={`Choose between ${MIN_DELEGATION_SIZE} and ${MAX_DELEGATION_SIZE} delegates.`}
           />
         </div>
       </section>
@@ -137,18 +160,6 @@ export function DelegationFields({
             </p>
           </div>
         </div>
-        <div className="delegate-controls">
-          <span>Need more places in your group?</span>
-          <button
-            className="button button-secondary add-delegate-button"
-            type="button"
-            onClick={() => onSizeChange(Math.min(value.size + 1, 7))}
-            disabled={value.size >= 7}
-          >
-            {value.size >= 7 ? "Maximum of 7 delegates" : "+ Add delegate"}
-          </button>
-        </div>
-
         <div className="delegate-list">
           {value.delegates.map((delegate, index) => {
             const isHeadDelegate = value.headIsDelegate && index === 0;
@@ -159,7 +170,36 @@ export function DelegationFields({
                     {String(index + 1).padStart(2, "0")}
                   </span>
                   <h4>Delegate {index + 1}</h4>
-                  {isHeadDelegate ? <span className="small-tag">Head delegate</span> : null}
+                  <div className="delegate-heading-actions">
+                    {isHeadDelegate ? <span className="small-tag">Head delegate</span> : null}
+                    <button
+                      className="delegate-remove-button"
+                      type="button"
+                      aria-label={`Remove delegate ${index + 1}`}
+                      title={
+                        value.size <= MIN_DELEGATION_SIZE
+                          ? `A delegation must include at least ${MIN_DELEGATION_SIZE} delegates.`
+                          : undefined
+                      }
+                      disabled={value.size <= MIN_DELEGATION_SIZE}
+                      onClick={() => {
+                        focusDelegateIndex.current = Math.max(0, index - 1);
+                        setAnnouncement(
+                          `Delegate ${index + 1} removed. ${value.size - 1} delegates remain.`,
+                        );
+                        onRemoveDelegate(index);
+                      }}
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        focusable="false"
+                      >
+                        <path d="M4.5 7h15M9 7V4.75h6V7m-8.25 0 .8 12.25h8.9L17.25 7M10 10.5v5.75m4-5.75v5.75" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
                 <div className="field-grid">
                   <InputField
@@ -233,6 +273,22 @@ export function DelegationFields({
             );
           })}
         </div>
+        <div className="delegate-controls">
+          <span>
+            Minimum {MIN_DELEGATION_SIZE} · {value.size} of {MAX_DELEGATION_SIZE} selected
+          </span>
+          <button
+            className="button button-secondary add-delegate-button"
+            type="button"
+            onClick={() =>
+              onSizeChange(Math.min(value.size + 1, MAX_DELEGATION_SIZE))
+            }
+            disabled={value.size >= MAX_DELEGATION_SIZE}
+          >
+            {value.size >= MAX_DELEGATION_SIZE ? "Maximum reached" : "+ Add delegate"}
+          </button>
+        </div>
+        <span className="visually-hidden" aria-live="polite">{announcement}</span>
       </section>
     </>
   );

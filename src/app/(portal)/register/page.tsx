@@ -41,7 +41,7 @@ export default function RegisterPage() {
             </div>
             <div className="page-eyebrow">
                 <span className="eyebrow-dot" />
-                Registration portal · Open to school and university students
+                Registration open · School &amp; university delegates
             </div>
             <div className="page-heading">
                 <p className="section-overline">18–20 November 2026 · Karachi</p>

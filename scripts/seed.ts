@@ -137,6 +137,7 @@ async function seed(): Promise<void> {
             {
                 $set: {
                     participantType: "solo",
+                    delegateCount: 1,
                     institution: "Seed Demo University",
                     status: "Payment under review",
                     contactName: soloDelegate.fullName,
@@ -172,6 +173,7 @@ async function seed(): Promise<void> {
             {
                 $set: {
                     participantType: "delegation",
+                    delegateCount: delegationMembers.length,
                     institution: "Seed Demo College",
                     status: "Payment confirmed",
                     contactName: "Hassan Demo",

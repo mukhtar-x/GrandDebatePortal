@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import { MAX_DELEGATION_SIZE, MIN_DELEGATION_SIZE } from "@/data/event";
 import { getCommitteeOptions } from "@/lib/committeeOptions";
 import connectDB from "@/lib/db";
 import { generateApplicationId } from "@/lib/idGenerator";
@@ -88,8 +89,15 @@ function parseRegistration(body: unknown, activeCodes: Set<string>): ParseResult
     if (participantType === "solo" && delegates.length !== 1) {
         return { success: false, error: "Solo registration must contain exactly one delegate.", field: "delegates" };
     }
-    if (participantType === "delegation" && (delegates.length < 4 || delegates.length > 7)) {
-        return { success: false, error: "A delegation must consist of between 4 and 7 delegates.", field: "delegates" };
+    if (
+        participantType === "delegation" &&
+        (delegates.length < MIN_DELEGATION_SIZE || delegates.length > MAX_DELEGATION_SIZE)
+    ) {
+        return {
+            success: false,
+            error: `A delegation must consist of between ${MIN_DELEGATION_SIZE} and ${MAX_DELEGATION_SIZE} delegates.`,
+            field: "delegates",
+        };
     }
 
     const institution = requiredText(body.institution, MAX_LENGTHS.institution);
@@ -383,6 +391,7 @@ export async function POST(request: Request): Promise<Response> {
                     {
                         applicationId,
                         participantType: registration.participantType,
+                        delegateCount: registration.delegates.length,
                         institution: registration.institution,
                         contactName: registration.contact.name,
                         contactEmail: registration.contact.email,
@@ -398,6 +407,20 @@ export async function POST(request: Request): Promise<Response> {
                 registration.delegates.map((delegate) => ({ ...delegate, applicationId })),
                 { session },
             );
+
+            const persistedDelegateCount = await Delegate.countDocuments({ applicationId }).session(session);
+            if (
+                registration.participantType === "delegation" &&
+                persistedDelegateCount < MIN_DELEGATION_SIZE
+            ) {
+                throw new Error(
+                    `Delegation invariant failed: expected at least ${MIN_DELEGATION_SIZE} persisted delegates.`,
+                );
+            }
+            if (persistedDelegateCount !== registration.delegates.length) {
+                throw new Error("Persisted delegate count does not match the registration payload.");
+            }
+
             await Payment.create(
                 [
                     {

@@ -1,4 +1,9 @@
-import { formatPKR } from "@/data/event";
+import {
+  formatPKR,
+  MAX_DELEGATION_SIZE,
+  MIN_DELEGATION_SIZE,
+  REGISTRATION_FEES,
+} from "@/data/event";
 import { InputField } from "@/components/ui/form-fields";
 
 interface PaymentSectionProps {
@@ -95,11 +100,14 @@ export function PaymentSection({
                 </tr>
               </thead>
               <tbody>
-                {[4, 5, 6, 7].map((count) => (
+                {Array.from(
+                  { length: MAX_DELEGATION_SIZE - MIN_DELEGATION_SIZE + 1 },
+                  (_, index) => MIN_DELEGATION_SIZE + index,
+                ).map((count) => (
                   <tr key={count} className={count === delegateCount ? "is-selected" : ""}>
                     <th scope="row">{count}</th>
-                    <td>{formatPKR(count * 2000)}</td>
-                    <td>{formatPKR(count * 2400)}</td>
+                    <td>{formatPKR(count * REGISTRATION_FEES.earlyBird)}</td>
+                    <td>{formatPKR(count * REGISTRATION_FEES.regular)}</td>
                   </tr>
                 ))}
               </tbody>

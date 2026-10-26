@@ -8,6 +8,9 @@ export const EVENT_DETAILS = {
   contactPhone: "0314 3552058",
 } as const;
 
+export const MIN_DELEGATION_SIZE = 4;
+export const MAX_DELEGATION_SIZE = 7;
+
 export const COMMITTEES = [
   { code: "UNSC", name: "United Nations Security Council" },
   { code: "DISEC", name: "Disarmament and International Security Committee" },

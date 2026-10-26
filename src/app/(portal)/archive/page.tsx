@@ -14,14 +14,13 @@ const GENERAL_RESOURCES = [
   "Introduction to MUN",
 ] as const;
 
-function ArchiveEmptyState() {
+function ArchiveUpdateNote() {
   return (
-    <div className="archive-empty-state">
-      <span className="archive-empty-icon" aria-hidden="true">✦</span>
+    <div className="archive-update-note">
       <div>
-        <strong>No documents have been uploaded yet.</strong>
+        <strong>More resources will be added here.</strong>
         <p>
-          Study guides will be added as committees finalise their materials. Follow{" "}
+          General delegate materials are updated as they are published. Follow{" "}
           <a href="https://www.instagram.com/tgd_nuces/" target="_blank" rel="noreferrer">
             @tgd_nuces
           </a>{" "}
@@ -88,7 +87,7 @@ export default function ArchivePage() {
             );
           })}
         </div>
-        <ArchiveEmptyState />
+        <ArchiveUpdateNote />
       </section>
 
       <section className="archive-section" aria-labelledby="archive-committee-title">
@@ -111,20 +110,19 @@ export default function ArchivePage() {
                     <span className="archive-folder-code">{committee.code}</span>
                     {committee.name}
                   </span>
-                  <span className="archive-folder-status">1 file available</span>
+                  <span className="archive-folder-status">Study guide available</span>
                 </summary>
-                <div className="archive-resource-list" style={{ padding: "1rem" }}>
+                <div className="archive-resource-list archive-folder-content">
                   <div className="archive-resource">
                     <span className="archive-resource-number">01</span>
-                    <span className="archive-resource-title">{committee.name} · Study Guide</span>
-                    <span className="archive-coming-soon">PDF</span>
+                    <span className="archive-resource-title">Study guide · PDF</span>
                     <a
                       className="button button-quiet"
                       href={guideHref}
                       target="_blank"
                       rel="noreferrer"
                     >
-                      Download
+                      Download PDF
                     </a>
                   </div>
                 </div>
