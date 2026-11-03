@@ -106,7 +106,6 @@ export default function ArchivePage() {
         </div>
         <div className="archive-folder-list">
           {COMMITTEE_DETAILS.map((committee) => {
-            const guideHref = `/docs/committees/${committee.code === "UN Women" ? "unwomen" : committee.code.toLowerCase()}-study-guide.pdf`;
             return (
               <details className="archive-folder" key={committee.code}>
                 <summary>
@@ -114,21 +113,33 @@ export default function ArchivePage() {
                     <span className="archive-folder-code">{committee.code}</span>
                     {committee.name}
                   </span>
-                  <span className="archive-folder-status">Study guide available</span>
+                  <span className="archive-folder-status">
+                    {committee.studyGuideHref ? "Study guide available" : "Coming soon"}
+                  </span>
                 </summary>
                 <div className="archive-resource-list archive-folder-content">
-                  <div className="archive-resource">
-                    <span className="archive-resource-number">01</span>
-                    <span className="archive-resource-title">Study guide · PDF</span>
-                    <a
-                      className="button button-quiet"
-                      href={guideHref}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Download PDF
-                    </a>
-                  </div>
+                  {committee.studyGuideHref ? (
+                    <div className="archive-resource">
+                      <span className="archive-resource-number">01</span>
+                      <span className="archive-resource-title">Study guide · PDF</span>
+                      <a
+                        className="button button-quiet"
+                        href={committee.studyGuideHref}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Download PDF
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="archive-empty-state">
+                      <span className="archive-empty-icon" aria-hidden="true">…</span>
+                      <div>
+                        <strong>Study guide coming soon</strong>
+                        <p>The PAC guide will be added when it is available.</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </details>
             );

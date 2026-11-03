@@ -14,7 +14,7 @@ type CountdownTarget = {
 
 const earlyBirdTarget: CountdownTarget = {
   title: "Early bird rate ends in",
-  description: "Save PKR 400 per delegate · until 7 November, 11:59 PM",
+  description: "Save PKR 400 per delegate · until 12 November, 11:59 PM",
   deadline: new Date(EARLY_BIRD_ENDS_AT).getTime(),
 };
 

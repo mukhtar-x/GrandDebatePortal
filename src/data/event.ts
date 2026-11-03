@@ -12,13 +12,13 @@ export const MIN_DELEGATION_SIZE = 4;
 export const MAX_DELEGATION_SIZE = 7;
 
 // Registration cutoffs use Pakistan time and are shared by pricing and the UI.
-export const EARLY_BIRD_ENDS_AT = "2026-11-08T00:00:00+05:00";
+export const EARLY_BIRD_ENDS_AT = "2026-11-13T00:00:00+05:00";
 export const REGISTRATION_ENDS_AT = "2026-11-16T00:00:00+05:00";
 
 export const COMMITTEES = [
   { code: "UNSC", name: "United Nations Security Council" },
   { code: "DISEC", name: "Disarmament and International Security Committee" },
-  { code: "SOCHUM", name: "Social, Humanitarian and Cultural Committee" },
+  { code: "PAC", name: "Pakistan Aurat Council" },
   {
     code: "UN Women",
     name: "United Nations Entity for Gender Equality and the Empowerment of Women",
@@ -37,9 +37,9 @@ const EARLY_BIRD_WINDOW = {
   key: "earlyBird",
   name: "Early bird",
   feePerDelegate: 2000,
-  deadline: "7 November 2026",
+  deadline: "12 November 2026",
   description:
-    "Early bird registration is open until 7 November. Delegates who register now pay PKR 2,000 instead of PKR 2,400.",
+    "Early bird registration is open until 12 November. Delegates who register now pay PKR 2,000 instead of PKR 2,400.",
 } as const;
 
 const REGULAR_WINDOW = {

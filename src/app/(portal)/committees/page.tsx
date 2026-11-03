@@ -7,7 +7,7 @@ import { getCanonicalUrl } from "@/lib/site-url";
 export const metadata: Metadata = {
   title: "Committees",
   description:
-    "Explore the five committees at The Grand Debate '26 and find the debate that suits you.",
+    "Explore the five committees and their agendas at The Grand Debate '26.",
   alternates: getCanonicalUrl("/committees") ? { canonical: getCanonicalUrl("/committees") } : undefined,
   openGraph: { title: "Committees at The Grand Debate '26", description: "Explore the five Model UN committees and choose your debate at The Grand Debate '26." },
 };
@@ -17,22 +17,14 @@ export default function CommitteesPage() {
     <div className="page-container committee-page">
       <div className="page-eyebrow">
         <span className="eyebrow-dot" />
-        Five committees · Agendas to be announced
+        Five committees · Agendas announced
       </div>
       <header className="page-heading">
         <p className="section-overline">Choose where to make your case</p>
         <h1>Committees</h1>
         <p className="page-intro">
-          Each committee has its own agenda, procedure and character. Review the
-          options below, then indicate your first and second preferences on the
-          registration form.
-        </p>
-        <p className="committee-update-note">
-          Agendas are being finalised and will be announced shortly. Follow{" "}
-          <a href="https://www.instagram.com/tgd_nuces/" target="_blank" rel="noreferrer">
-            @tgd_nuces
-          </a>{" "}
-          for updates.
+          Review each committee&apos;s agenda and character, then indicate your first and
+          second preferences on the registration form.
         </p>
       </header>
 
@@ -53,8 +45,9 @@ export default function CommitteesPage() {
             <h2>{committee.name}</h2>
             <div className="committee-agenda">
               <span>Agenda</span>
-              <strong>To be announced</strong>
+              <strong>{committee.agenda}</strong>
             </div>
+            <p className="committee-agenda-description">{committee.agendaDescription}</p>
             <p className="committee-suited">
               <strong>Suited to</strong>
               {committee.suitedTo}
@@ -69,14 +62,20 @@ export default function CommitteesPage() {
                 <dd>To be confirmed</dd>
               </div>
             </dl>
-            <a
-              className="button button-quiet committee-guide-button"
-              href={`/docs/committees/${committee.code === "UN Women" ? "unwomen" : committee.code.toLowerCase()}-study-guide.pdf`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Study guide · PDF <ActionIcon direction="down" />
-            </a>
+            {committee.studyGuideHref ? (
+              <a
+                className="button button-quiet committee-guide-button"
+                href={committee.studyGuideHref}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Study guide · PDF <ActionIcon direction="down" />
+              </a>
+            ) : (
+              <button className="button button-quiet committee-guide-button" type="button" disabled>
+                Study guide coming soon
+              </button>
+            )}
           </article>
         ))}
       </div>

@@ -72,6 +72,25 @@ export default function Home() {
           </div>
         </section>
 
+        <section className="brand-ambassador-callout" aria-labelledby="brand-ambassador-title">
+          <div className="brand-ambassador-copy">
+            <p className="section-overline">Represent The Grand Debate</p>
+            <h2 id="brand-ambassador-title">Become a Brand Ambassador</h2>
+            <p>
+              Students interested in becoming a Brand Ambassador should complete the
+              separate Google Form.
+            </p>
+          </div>
+          <a
+            className="button button-primary"
+            href="https://docs.google.com/forms/d/e/1FAIpQLSfvOkzClM80pgp0WkS0WuxLZTd-niseWyoKcjuA1VxpwgGKDA/viewform"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Register as Brand Ambassador <ActionIcon direction="up-right" />
+          </a>
+        </section>
+
         <section className="home-next-steps" aria-labelledby="home-next-title">
           <div className="home-section-heading">
             <p className="section-overline">Your conference journey</p>

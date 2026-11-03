@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ActionIcon } from "@/components/shared/action-icon";
+import { InputField } from "@/components/ui/form-fields";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { DelegationFields } from "@/components/registration/delegation-fields";
 import { PaymentSection } from "@/components/registration/payment-section";
@@ -243,7 +244,7 @@ export function RegistrationFlow() {
           may monitor your progress in the portal at any time.
         </p>
         <p className="confirmation-copy">
-          We'll send an update to the email address on your registration. If it doesn't
+          We&apos;ll send an update to the email address on your registration. If it doesn&apos;t
           appear in your inbox, please check your spam or junk folder.
         </p>
         <div className="application-id-box">
@@ -361,6 +362,16 @@ export function RegistrationFlow() {
               onRemoveDelegate={handleRemoveDelegate}
             />
           )}
+          <div className="field-grid field-grid-single">
+            <InputField
+              id="registration-ba-code"
+              name="baCode"
+              label="BA Code"
+              placeholder="Enter your BA Code, if you have one"
+              autoComplete="off"
+              hint="Optional. The registration service does not currently accept or store this code."
+            />
+          </div>
         </section>
 
         <div className="registration-mobile-summary">
