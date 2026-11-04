@@ -10,6 +10,7 @@ import {
   type DelegateRow,
   type PortalApplication,
 } from "@/lib/api/portal";
+import { quickPayPaymentId } from "@/lib/paymentDetails";
 
 const statusSteps = [
   {
@@ -210,7 +211,7 @@ function ApplicationStatusView({
         </span>
       </div>
       {application.payment?.challanNumber ? <div className="application-meta">
-        <span><small>QuickPay challan</small><strong>{application.payment.challanNumber}{application.payment.test ? " · TEST — do not pay" : ""}</strong></span>
+        <span><small>{application.payment.test ? "Test challan" : "QuickPay ID"}</small><strong>{application.payment.test ? `${application.payment.challanNumber} · TEST — do not pay` : quickPayPaymentId(application.payment.challanNumber)}</strong></span>
         <span><small>Amount</small><strong>{`PKR ${application.payment.totalPayable.toLocaleString("en-PK")}`}</strong></span>
       </div> : null}
 

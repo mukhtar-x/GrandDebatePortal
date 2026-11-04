@@ -28,6 +28,8 @@ export interface IChallanIssue {
     /** Random id the browser keeps for one form fill; links every challan generated during it. */
     draftId?: string;
     ipHash: string;
+    /** Opaque first-party browser identifier used for the concurrent reservation cap. */
+    deviceHash?: string;
     status: ChallanIssueStatus;
     reservedAt: Date;
     /** Last moment the applicant could submit with this challan. */
@@ -59,6 +61,7 @@ const challanIssueSchema = new Schema<IChallanIssue>({
     baCode: { type: String, trim: true },
     draftId: { type: String, trim: true },
     ipHash: { type: String, required: true },
+    deviceHash: { type: String },
     status: { type: String, enum: CHALLAN_ISSUE_STATUSES, default: "Active", required: true },
     reservedAt: { type: Date, required: true },
     expiresAt: { type: Date, required: true },
@@ -74,6 +77,7 @@ challanIssueSchema.index({ linkedApplicationId: 1 }, { sparse: true });
 challanIssueSchema.index({ draftId: 1 }, { sparse: true });
 challanIssueSchema.index({ contactEmail: 1, reservedAt: -1 });
 challanIssueSchema.index({ ipHash: 1, status: 1, expiresAt: 1 });
+challanIssueSchema.index({ deviceHash: 1, status: 1, expiresAt: 1 });
 
 export function challanIssueStatus(issue: Pick<IChallanIssue, "status" | "expiresAt">, now = new Date()) {
     return issue.status === "Active" && new Date(issue.expiresAt) <= now ? "Expired" : issue.status;

@@ -1422,6 +1422,14 @@ textarea.form-control {
   gap: 10px;
 }
 
+.quickpay-biller-prefix {
+  color: var(--grand-gold);
+}
+
+.quickpay-challan-digits {
+  color: var(--desert-sand);
+}
+
 .challan-number-row strong,
 .challan-amount strong {
   color: var(--desert-sand);

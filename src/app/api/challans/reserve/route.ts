@@ -1,13 +1,16 @@
 import { getCommitteeOptions } from "@/lib/committeeOptions";
+import { randomBytes } from "node:crypto";
 import connectDB from "@/lib/db";
 import {
     CHALLAN_ENVIRONMENT,
     NoChallanAvailableError,
     createReservationToken,
     endReservation,
+    ensureDeviceGate,
     getChallanDetails,
     hashSecret,
     issueChallan,
+    lockDeviceGate,
     registrationFingerprint,
     type ReservationView,
 } from "@/lib/challans";
@@ -25,13 +28,17 @@ const HOUR_MS = 60 * 60 * 1000;
 const MAX_BODY_BYTES = 32 * 1024;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{40,60}$/;
 const DRAFT_ID_PATTERN = /^[A-Za-z0-9_-]{8,100}$/;
+const DEVICE_COOKIE = "tgd_challan_device";
+const DEVICE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{40,60}$/;
 /**
- * Challans one network may hold at once. Schools often share one IP, so this is a cap on
- * pool draining rather than a per-person limit.
+ * Concurrent challans one browser may hold. The IP request limits remain a separate abuse control.
  */
-const MAX_ACTIVE_PER_IP = 5;
+const MAX_ACTIVE_PER_DEVICE = 5;
 
-function reservationResponse(token: string, challan: ReservationView, resumed = false): Response {
+class DeviceReservationLimitError extends Error {}
+
+function reservationResponse(token: string, challan: ReservationView, deviceToken: string, resumed = false): Response {
+    const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
     return Response.json({
         success: true,
         reservationToken: token,
@@ -43,7 +50,13 @@ function reservationResponse(token: string, challan: ReservationView, resumed = 
         graceUntil: challan.graceUntil,
         test: CHALLAN_ENVIRONMENT === "test",
         resumed,
-    });
+    }, { headers: { "Set-Cookie": `${DEVICE_COOKIE}=${deviceToken}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax${secure}` } });
+}
+
+function getDeviceToken(request: Request) {
+    const match = request.headers.get("cookie")?.match(new RegExp(`(?:^|;\\s*)${DEVICE_COOKIE}=([^;]+)`));
+    const existing = match?.[1];
+    return typeof existing === "string" && DEVICE_TOKEN_PATTERN.test(existing) ? existing : randomBytes(32).toString("base64url");
 }
 
 function pktTime(date: Date): string {
@@ -54,6 +67,7 @@ export async function POST(request: Request): Promise<Response> {
     const crossOrigin = rejectCrossOrigin(request);
     if (crossOrigin) return crossOrigin;
     const ip = getClientIp(request);
+    const deviceToken = getDeviceToken(request);
     const ipLimit = await consumeRateLimits([
         { key: `challan-reserve-burst:${ip}`, limit: 10, windowMs: 60 * 1000 },
         { key: `challan-reserve:${ip}`, limit: 20, windowMs: HOUR_MS },
@@ -84,7 +98,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const contactHash = hashSecret(details.contact.email);
-    const emailLimit = await consumeRateLimits([{ key: `challan-reserve-email:${contactHash}`, limit: 8, windowMs: HOUR_MS }]);
+    const emailLimit = await consumeRateLimits([{ key: `challan-reserve-email:${contactHash}`, limit: 2, windowMs: 30 * 60 * 1000 }]);
     if (!emailLimit.allowed) {
         return rateLimitedResponse(emailLimit.retryAfterSeconds, "Too many challans were requested for this email. Please wait a while and try again.");
     }
@@ -94,12 +108,15 @@ export async function POST(request: Request): Promise<Response> {
     const previousTokenHash = typeof previousToken === "string" && TOKEN_PATTERN.test(previousToken) ? hashSecret(previousToken) : null;
     const fingerprint = registrationFingerprint(details);
     const ipHash = hashSecret(`challan-ip:${ip}`);
+    const deviceHash = hashSecret(`challan-device:${deviceToken}`);
     const token = createReservationToken();
     const now = new Date();
 
     try {
         await connectDB();
-        if (CHALLAN_ENVIRONMENT === "test") await ensureTestChallanPool();
+        // Keep test inventory opt-in so a development request cannot recreate a test pool
+        // in a database that has been intentionally cleared for live challans.
+        if (CHALLAN_ENVIRONMENT === "test" && process.env.CHALLAN_MODE === "test") await ensureTestChallanPool();
 
         // Checked before a challan is issued, so nobody pays for a registration that would be refused.
         const duplicate = await alreadyRegisteredResponse(details);
@@ -119,7 +136,7 @@ export async function POST(request: Request): Promise<Response> {
                 { _id: held._id, status: "Reserved", reservationTokenHash: held.reservationTokenHash },
                 { $set: { reservationTokenHash: token.tokenHash } },
             );
-            if (rotated.modifiedCount === 1) return reservationResponse(token.token, held, true);
+            if (rotated.modifiedCount === 1) return reservationResponse(token.token, held, deviceToken, true);
         } else if (held && held.reservationTokenHash !== previousTokenHash) {
             return Response.json({
                 success: false,
@@ -128,17 +145,10 @@ export async function POST(request: Request): Promise<Response> {
             }, { status: 409 });
         }
 
-        const activeOnNetwork = await ChallanIssue.countDocuments({
-            ipHash,
-            status: "Active",
-            expiresAt: { $gt: now },
-            environment: CHALLAN_ENVIRONMENT,
-        });
-        if (activeOnNetwork >= MAX_ACTIVE_PER_IP + (previousTokenHash ? 1 : 0)) {
-            return rateLimitedResponse(15 * 60, "Too many challans are currently reserved from this network. Please submit or wait for one to expire.");
-        }
+        await ensureDeviceGate(deviceHash, now);
 
         const challan = await withTransaction(async (session) => {
+            await lockDeviceGate(deviceHash, now, session);
             // After 30 minutes a reservation can no longer be submitted, so this email may reserve
             // again. The old challan keeps its graceUntil and stays out of the pool until then.
             await Challan.updateMany(
@@ -147,6 +157,13 @@ export async function POST(request: Request): Promise<Response> {
                 { session },
             );
             if (previousTokenHash) await endReservation(previousTokenHash, "Superseded", now, session);
+            const activeOnDevice = await ChallanIssue.countDocuments({
+                deviceHash,
+                status: "Active",
+                expiresAt: { $gt: now },
+                environment: CHALLAN_ENVIRONMENT,
+            }).session(session);
+            if (activeOnDevice >= MAX_ACTIVE_PER_DEVICE) throw new DeviceReservationLimitError();
             return issueChallan({
                 details,
                 pricing: pricingResult.pricing,
@@ -154,13 +171,17 @@ export async function POST(request: Request): Promise<Response> {
                 contactHash,
                 tokenHash: token.tokenHash,
                 ipHash,
+                deviceHash,
                 ...(typeof draftId === "string" && DRAFT_ID_PATTERN.test(draftId) ? { draftId } : {}),
                 now,
                 session,
             });
         });
-        return reservationResponse(token.token, challan);
+        return reservationResponse(token.token, challan, deviceToken);
     } catch (error) {
+        if (error instanceof DeviceReservationLimitError) {
+            return rateLimitedResponse(15 * 60, "Too many challans are currently reserved in this browser. Please submit one or wait for one to expire.");
+        }
         if (error instanceof NoChallanAvailableError) {
             return Response.json({ success: false, error: "No challans are currently available for this registration amount. Please contact the organisers.", code: "NO_CHALLANS" }, { status: 409 });
         }

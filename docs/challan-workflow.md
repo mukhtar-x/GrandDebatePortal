@@ -165,8 +165,8 @@ the challan history and confirm which applicant the payment belongs to.
 
 | | Test | Live |
 | --- | --- | --- |
-| Set by | `CHALLAN_MODE=test` (default outside production) | `CHALLAN_MODE=live` (default in production) |
-| Inventory | 3,000 `TEST-` challans created automatically | Empty until FAST's challans are imported |
+| Set by | `CHALLAN_MODE=test` (test environment is otherwise the non-production default) | `CHALLAN_MODE=live` (default in production) |
+| Inventory | 3,000 `TEST-` challans created when `CHALLAN_MODE=test` is explicitly set | Empty until FAST's challans are imported |
 | Applicant warning | "Test challan: do not make a real payment" on screen and in the email | None |
 
 Test and live challans are kept apart; a test challan can never be submitted in live mode.
@@ -210,16 +210,19 @@ Amounts per challan:
 | Protection | Limit |
 | --- | --- |
 | Challan requests per IP | 10 per minute, 20 per hour |
-| Challan requests per contact email | 8 per hour |
-| Challans held at once per network (IP) | 5 |
+| Challan requests per contact email | 2 per 30 minutes |
+| Challans held at once per browser | 5 |
 | Registration submissions per IP | 10 per minute, 20 per hour |
 | Challan release requests per IP | 30 per hour |
 | Request size | Challan requests 32 KB; registrations must declare a size, and the receipt is capped at 4 MB |
 | Bots | A hidden field rejects bots that fill every input |
 
-Limits are checked in memory on each server instance first, then in MongoDB so they hold
-across instances. Students at one school often share an IP address; if they reach these
-limits, adjust the constants in the route files listed below.
+Request limits are checked in memory on each server instance first, then in MongoDB so they
+hold across instances. The held-challan cap uses a first-party, HttpOnly browser cookie and a
+database lock to enforce the limit across concurrent requests. Clearing browser cookies can
+reset that device identifier; IP request limits remain in place as a separate abuse control.
+If MongoDB cannot check a shared rate limit, the endpoint returns `503` and asks the applicant
+to retry instead of allowing the request through.
 
 These limits slow down abuse but cannot stop a large network flood. For that, use the
 Vercel Firewall, and turn on Attack Challenge Mode during an attack. If bots start
@@ -245,7 +248,8 @@ Error codes returned to the browser:
 | `CHALLAN_HELD` | This email already holds a challan for different details |
 | `NO_CHALLANS` | No matching challan is available |
 | `CHALLAN_INVALID` | At submit, the challan has expired or no longer matches the details |
-| `RATE_LIMITED` | A rate limit or the per-network cap was reached |
+| `RATE_LIMITED` | A request limit or the per-browser reservation cap was reached |
+| `RATE_LIMIT_UNAVAILABLE` | Shared rate-limit storage is unavailable; retry shortly |
 | `REGISTRATION_CLOSED` | The registration window has ended |
 
 ## Where the code lives

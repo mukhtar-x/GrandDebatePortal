@@ -1,3 +1,10 @@
+/** Five-digit KuickPay biller code supplied by FAST Accounts. */
+export const QUICKPAY_BILLER_CODE = "10320";
+
+export function quickPayPaymentId(challanNumber: string) {
+    return `${QUICKPAY_BILLER_CODE}${challanNumber}`;
+}
+
 /**
  * Where delegates send the registration fee. [Payment details to be confirmed]
  * Fill these in once confirmed; the receipt checker compares receipts against them, and the

@@ -41,14 +41,13 @@ export async function loadChallanHistories(challanNumbers: string[]): Promise<Ch
             .lean<Array<{ challanNumber: string; environment: "test" | "live"; category: string; rateType: string; amount: number; status: string; issueCount?: number; applicationId?: string }>>(),
         ChallanIssue.find({ challanNumber: { $in: numbers } })
             .sort({ reservedAt: 1 })
-            .select("-_id -ipHash -draftId -__v")
+            .select("-_id -ipHash -deviceHash -draftId -__v")
             .lean<IChallanIssue[]>(),
     ]);
     const now = new Date();
     return numbers.map((challanNumber) => {
         const challan = challans.find((item) => item.challanNumber === challanNumber);
         const own = issues.filter((issue) => issue.challanNumber === challanNumber);
-        const holders = new Set(own.map((issue) => issue.contactEmail));
         return {
             challanNumber,
             ...(challan ? {
@@ -60,7 +59,7 @@ export async function loadChallanHistories(challanNumbers: string[]): Promise<Ch
                 applicationId: challan.applicationId,
             } : {}),
             issueCount: challan?.issueCount ?? own.length,
-            reused: holders.size > 1,
+            reused: (challan?.issueCount ?? own.length) > 1,
             issues: own.map((issue) => ({
                 issueNumber: issue.issueNumber,
                 status: challanIssueStatus(issue, now),

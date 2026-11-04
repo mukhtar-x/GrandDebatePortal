@@ -4,6 +4,7 @@ import { calculatePricing, type Pricing } from "@/lib/pricing";
 import type { RegistrationDetails } from "@/lib/registrationInput";
 import Challan, { type ChallanCategory } from "@/models/Challan";
 import ChallanIssue from "@/models/ChallanIssue";
+import ChallanDeviceGate from "@/models/ChallanDeviceGate";
 
 /** How long an applicant has to pay and submit with a challan. */
 export const CHALLAN_RESERVATION_MS = 30 * 60 * 1000;
@@ -66,6 +67,33 @@ export function reusableChallanFilter(now: Date) {
 
 /** Unused challans first, then the least reused, then the one released longest ago. */
 export const CHALLAN_ISSUE_ORDER = { issueCount: 1, graceUntil: 1, challanNumber: 1 } as const;
+const DEVICE_GATE_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** Ensure the lock row exists before entering a transaction, avoiding concurrent upsert races. */
+export async function ensureDeviceGate(deviceHash: string, now: Date) {
+    try {
+        await ChallanDeviceGate.updateOne(
+            { deviceHash },
+            {
+                $set: { expiresAt: new Date(now.getTime() + DEVICE_GATE_TTL_MS) },
+                $setOnInsert: { deviceHash, version: 0 },
+            },
+            { upsert: true },
+        );
+    } catch (error) {
+        if (!(error && typeof error === "object" && (error as { code?: number }).code === 11000)) throw error;
+    }
+}
+
+/** Serialize cap checks for one browser identifier inside the reservation transaction. */
+export async function lockDeviceGate(deviceHash: string, now: Date, session: ClientSession) {
+    const result = await ChallanDeviceGate.updateOne(
+        { deviceHash },
+        { $inc: { version: 1 }, $set: { expiresAt: new Date(now.getTime() + DEVICE_GATE_TTL_MS) } },
+        { session },
+    );
+    if (result.matchedCount !== 1) throw new Error("Challan device lock is unavailable.");
+}
 
 const END_RESERVATION = {
     $unset: { reservationTokenHash: 1, registrationFingerprint: 1, reservationContactHash: 1, expiresAt: 1 },
@@ -119,6 +147,7 @@ export async function issueChallan(input: {
     contactHash: string;
     tokenHash: string;
     ipHash: string;
+    deviceHash: string;
     draftId?: string;
     now: Date;
     session: ClientSession;
@@ -171,6 +200,7 @@ export async function issueChallan(input: {
         ...(details.baCode ? { baCode: details.baCode } : {}),
         ...(input.draftId ? { draftId: input.draftId } : {}),
         ipHash: input.ipHash,
+        deviceHash: input.deviceHash,
         status: "Active",
         reservedAt: now,
         expiresAt,

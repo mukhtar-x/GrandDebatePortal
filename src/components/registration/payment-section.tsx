@@ -2,6 +2,7 @@ import { useState, type Ref } from "react";
 import { InputField } from "@/components/ui/form-fields";
 import { DELEGATION_FEE, EVENT_DETAILS, RECEIPT_MAX_BYTES, RECEIPT_TYPES, formatPKR } from "@/data/event";
 import type { ChallanReservation } from "@/lib/api/registration";
+import { QUICKPAY_BILLER_CODE, quickPayPaymentId } from "@/lib/paymentDetails";
 
 interface PaymentSectionProps {
   delegateCount: number;
@@ -52,21 +53,22 @@ export function PaymentSection({
   headingRef,
 }: PaymentSectionProps) {
   const [receiptError, setReceiptError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copiedId, setCopiedId] = useState(false);
 
   const expiresAt = reservation ? Date.parse(reservation.expiresAt) : 0;
   const phase: Phase = now === 0 ? "loading" : now < expiresAt ? "reserved" : "expired";
   const delegationFee = delegateCount > 1 ? DELEGATION_FEE : 0;
   const perDelegate = reservation ? (reservation.amount - delegationFee) / delegateCount : 0;
 
-  async function copyChallanNumber() {
+  async function copyQuickPayId() {
     if (!reservation) return;
+    const value = reservation.test ? reservation.challanNumber : quickPayPaymentId(reservation.challanNumber);
     try {
-      await navigator.clipboard.writeText(reservation.challanNumber);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
+      await navigator.clipboard.writeText(value);
+      setCopiedId(true);
+      window.setTimeout(() => setCopiedId(false), 2000);
     } catch {
-      // Clipboard access can be blocked; the number stays visible and selectable.
+      // Clipboard access can be blocked; the ID stays visible and selectable.
     }
   }
 
@@ -93,19 +95,26 @@ export function PaymentSection({
           {reservation.test ? (
             <div className="challan-test-banner" role="note">
               <strong>Test challan: do not make a real payment.</strong>
-              <span>This site is running in test mode. Live FAST challans have not been loaded.</span>
+              <span>This test challan cannot be paid. Switch to live mode to get a bank payment ID.</span>
             </div>
           ) : null}
 
           <div className="challan-card">
             <div className="challan-number">
-              <span className="payment-label">QuickPay challan number</span>
+              <span className="payment-label">{reservation.test ? "Test challan" : "QuickPay ID"}</span>
               <div className="challan-number-row">
-                <strong>{reservation.challanNumber}</strong>
-                <button className="button button-quiet challan-copy" type="button" onClick={() => void copyChallanNumber()}>
-                  {copied ? "Copied" : "Copy"}
+                <strong aria-label={reservation.test ? reservation.challanNumber : quickPayPaymentId(reservation.challanNumber)}>
+                  {reservation.test ? (
+                    reservation.challanNumber
+                  ) : (
+                    <><span className="quickpay-biller-prefix">{QUICKPAY_BILLER_CODE}</span><span className="quickpay-challan-digits">{reservation.challanNumber}</span></>
+                  )}
+                </strong>
+                <button className="button button-quiet challan-copy" type="button" onClick={() => void copyQuickPayId()}>
+                  {copiedId ? "Copied" : "Copy ID"}
                 </button>
               </div>
+              {!reservation.test ? <span className="payment-rate">Enter this ID in your bank app’s Bill Payment / KuickPay field.</span> : null}
             </div>
             <div className="challan-amount">
               <span className="payment-label">Pay exactly</span>
@@ -123,7 +132,7 @@ export function PaymentSection({
                 <div>
                   <strong>This challan has expired.</strong>
                   <span>
-                    Do not pay challan {reservation.challanNumber}. Generate a new challan to continue.
+                    Do not pay {reservation.test ? "test challan " : "QuickPay ID "}{reservation.test ? reservation.challanNumber : quickPayPaymentId(reservation.challanNumber)}. Generate a new challan to continue.
                     If you already paid it, contact the organisers at {EVENT_DETAILS.contactEmail} with your receipt.
                   </span>
                 </div>
@@ -146,9 +155,13 @@ export function PaymentSection({
           </p>
 
           <ol className="payment-steps">
-            <li>Pay exactly <strong>{formatPKR(reservation.amount)}</strong> against challan <strong>{reservation.challanNumber}</strong>.</li>
-            <li>Save the payment screenshot or receipt. The amount, date and challan number should be readable.</li>
-            <li>Upload it below and submit before the timer ends.</li>
+            {reservation.test ? (
+              <li>This is a test challan. Do not make a real payment.</li>
+            ) : (
+              <li>In your bank app, select Bill Payment / KuickPay and enter QuickPay ID <strong>{quickPayPaymentId(reservation.challanNumber)}</strong>.</li>
+            )}
+            <li>Pay exactly <strong>{formatPKR(reservation.amount)}</strong>. Keep the QuickPay ID visible on the receipt.</li>
+            <li>Upload the payment screenshot or receipt and submit before the timer ends.</li>
           </ol>
         </>
       ) : (

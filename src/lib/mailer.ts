@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import connectDB from "@/lib/db";
 import { firstName } from "@/lib/validation";
 import { EVENT_DETAILS as EVENT } from "@/data/event";
+import { quickPayPaymentId } from "@/lib/paymentDetails";
 import Application from "@/models/Application";
 import Committee from "@/models/Committee";
 import Delegate from "@/models/Delegate";
@@ -257,7 +258,7 @@ function describe(event: MailEvent, applicationId: string): EmailContent {
                             { label: "Rate applied", value: event.rateType },
                             { label: "Fee per delegate", value: `PKR ${perDelegate.toLocaleString("en-US")}` },
                             ...(event.delegationFee ? [{ label: "Delegation fee", value: `PKR ${event.delegationFee.toLocaleString("en-US")}` }] : []),
-                            { label: "QuickPay challan", value: event.challanNumber + (event.challanEnvironment === "test" ? " (TEST — do not pay)" : "") },
+                            { label: event.challanEnvironment === "test" ? "Test challan" : "QuickPay ID", value: event.challanEnvironment === "test" ? `${event.challanNumber} (TEST — do not pay)` : quickPayPaymentId(event.challanNumber) },
                             { label: "Total payable", value: `PKR ${event.totalPayable.toLocaleString("en-US")}` },
                             { label: "Status", value: "Payment under review" },
                         ],

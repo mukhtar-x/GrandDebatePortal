@@ -35,6 +35,7 @@ import {
   type ChallanReservation,
   type RegistrationSuccess,
 } from "@/lib/api/registration";
+import { quickPayPaymentId } from "@/lib/paymentDetails";
 
 const STEPS = ["Type", "Details", "Review", "Payment"] as const;
 const DRAFT_STORAGE_KEY = "tgd26-registration-draft";
@@ -503,7 +504,7 @@ export function RegistrationFlow() {
         <p className="section-overline">Registration received</p>
         <h2>Thank you, {confirmation.firstName}.</h2>
         <p className="confirmation-copy">
-          Your registration has been received with challan {confirmation.challanNumber}{confirmation.test ? " (TEST, not payable)" : ""}. Your payment will now be reviewed. Once it
+          Your registration has been received with {confirmation.test ? `test challan ${confirmation.challanNumber} (not payable)` : `QuickPay ID ${quickPayPaymentId(confirmation.challanNumber)}`}. Your payment will now be reviewed. Once it
           is confirmed, your committee will be allocated within 1 to 3 business days. You
           may monitor your progress in the portal at any time.
         </p>

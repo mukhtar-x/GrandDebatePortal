@@ -4,6 +4,7 @@ import RateLimit from "@/models/RateLimit";
 export interface RateLimitResult {
     allowed: boolean;
     retryAfterSeconds: number;
+    unavailable?: boolean;
 }
 
 export interface RateLimitRule {
@@ -50,7 +51,7 @@ function consumeMemory(windowKey: string, windowEnd: number, now: number): numbe
 /**
  * Fixed-window counter: checked in memory first, then stored in MongoDB so the limit holds
  * across instances. Expired windows are removed by the TTL index. If the database is
- * unreachable the in-memory limit still applies and the error is logged.
+ * unreachable, callers fail closed because per-instance counters cannot enforce a shared limit.
  */
 export async function consumeRateLimit(
     key: string,
@@ -85,8 +86,8 @@ export async function consumeRateLimit(
 
         return { allowed: (entry?.count ?? 0) <= limit, retryAfterSeconds };
     } catch (error) {
-        console.error("Rate limit check failed; using the in-memory limit only:", error);
-        return { allowed: true, retryAfterSeconds: 0 };
+        console.error("Rate limit store unavailable:", error);
+        return { allowed: false, retryAfterSeconds: 0, unavailable: true };
     }
 }
 
@@ -100,6 +101,12 @@ export async function consumeRateLimits(rules: RateLimitRule[]): Promise<RateLim
 }
 
 export function rateLimitedResponse(retryAfterSeconds: number, error = "Too many requests. Please wait a while and try again."): Response {
+    if (retryAfterSeconds === 0) {
+        return Response.json(
+            { success: false, error: "Request protection is temporarily unavailable. Please try again shortly.", code: "RATE_LIMIT_UNAVAILABLE" },
+            { status: 503, headers: { "Retry-After": "10" } },
+        );
+    }
     return Response.json(
         { success: false, error, code: "RATE_LIMITED" },
         { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } },
