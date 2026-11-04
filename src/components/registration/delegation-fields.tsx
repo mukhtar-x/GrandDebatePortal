@@ -26,6 +26,22 @@ const sizeOptions = Array.from(
   label: size + " delegates",
 }));
 
+/** Same rules the browser checks: every field filled and two different committees. */
+export function isDelegateComplete(delegate: DelegateFormValues) {
+  return (
+    Boolean(delegate.fullName.trim() && delegate.email.trim() && delegate.whatsapp.trim() && delegate.experience) &&
+    Boolean(delegate.firstPreference && delegate.secondPreference) &&
+    delegate.firstPreference !== delegate.secondPreference
+  );
+}
+
+/** Opens the collapsed card holding an element (for focus and validation), then focuses it. */
+export function revealAndFocus(element: HTMLElement | null) {
+  const card = element?.closest("details");
+  if (card && !card.open) card.open = true;
+  element?.focus();
+}
+
 interface DelegationFieldsProps {
   value: DelegationFormValues;
   onFieldChange: (field: "institution" | "headName" | "headEmail" | "headWhatsapp", value: string) => void;
@@ -49,12 +65,13 @@ export function DelegationFields({
 }: DelegationFieldsProps) {
   const focusDelegateIndex = useRef<number | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  const completeCount = value.delegates.filter(isDelegateComplete).length;
 
   useEffect(() => {
     const index = focusDelegateIndex.current;
     if (index === null) return;
 
-    document.getElementById(`delegate-${index}-name`)?.focus();
+    revealAndFocus(document.getElementById(`delegate-${index}-name`));
     focusDelegateIndex.current = null;
   }, [value.delegates.length]);
 
@@ -120,7 +137,7 @@ export function DelegationFields({
             name="headDelegateEmail"
             type="email"
             label="Email address"
-            placeholder="you@example.com"
+            placeholder="e.g. name@school.edu.pk"
             autoComplete="email"
             onBlur={(event) => onFieldChange("headEmail", event.currentTarget.value.trim().toLowerCase())}
             value={value.headEmail}
@@ -133,7 +150,7 @@ export function DelegationFields({
             name="headDelegateWhatsapp"
             type="tel"
             label="WhatsApp number"
-            placeholder="+92 300 1234567"
+            placeholder="e.g. 0300 1234567"
             autoComplete="tel"
             inputMode="tel"
             onBlur={(event) => onFieldChange("headWhatsapp", formatWhatsAppNumber(event.currentTarget.value))}
@@ -163,33 +180,117 @@ export function DelegationFields({
           <div>
             <h3>Delegate details</h3>
             <p>
-              Add the {value.size} delegates in your group. Each delegate selects two
-              committee preferences.
+              Add the {value.size} delegates in your group. Open each card to fill it in;
+              {" "}{completeCount} of {value.size} complete.
             </p>
           </div>
         </div>
         <div className="delegate-list">
           {value.delegates.map((delegate, index) => {
             const isHeadDelegate = value.headIsDelegate && index === 0;
+            const complete = isDelegateComplete(delegate);
+            const summary = [
+              delegate.fullName.trim(),
+              delegate.firstPreference && delegate.secondPreference
+                ? `${delegate.firstPreference} / ${delegate.secondPreference}`
+                : "",
+            ].filter(Boolean).join(" · ");
             return (
-              <article className="delegate-card" key={index}>
-                <div className="delegate-card-heading">
-                  <span className="delegate-number">
-                    {String(index + 1).padStart(2, "0")}
+              // Native details: one card open at a time (shared name), and every input stays in the
+              // form so the browser can still validate collapsed cards.
+              <details className="delegate-card" key={index} name="delegate-cards" open={index === 0}>
+                <summary className="delegate-card-heading">
+                  <span className="delegate-number">{String(index + 1).padStart(2, "0")}</span>
+                  <span className="delegate-card-title">
+                    <strong>Delegate {index + 1}</strong>
+                    <span className="delegate-card-summary">{summary || "Not filled in yet"}</span>
                   </span>
-                  <h4>Delegate {index + 1}</h4>
-                  <div className="delegate-heading-actions">
+                  <span className="delegate-heading-actions">
                     {isHeadDelegate ? <span className="small-tag">Head delegate</span> : null}
-                    <button
-                      className="delegate-remove-button"
-                      type="button"
-                      aria-label={`Remove delegate ${index + 1}`}
-                      title={
-                        value.size <= MIN_DELEGATION_SIZE
-                          ? `A delegation must include at least ${MIN_DELEGATION_SIZE} delegates.`
-                          : undefined
+                    <span className={complete ? "delegate-status is-complete" : "delegate-status"}>
+                      {complete ? "Complete" : "Incomplete"}
+                    </span>
+                    <span className="delegate-chevron" aria-hidden="true" />
+                  </span>
+                </summary>
+                <div className="delegate-card-body">
+                  <div className="field-grid">
+                    <InputField
+                      id={"delegate-" + index + "-name"}
+                      name={"delegates[" + index + "][fullName]"}
+                      label="Full name"
+                      autoComplete="name"
+                      autoCapitalize="words"
+                      onBlur={(event) => onDelegateChange(index, "fullName", event.currentTarget.value.trim().replace(/\s+/g, " "))}
+                      value={delegate.fullName}
+                      readOnly={isHeadDelegate}
+                      onChange={(event) =>
+                        onDelegateChange(index, "fullName", event.currentTarget.value)
                       }
-                      disabled={value.size <= MIN_DELEGATION_SIZE}
+                      required
+                    />
+                    <InputField
+                      id={"delegate-" + index + "-email"}
+                      name={"delegates[" + index + "][email]"}
+                      type="email"
+                      label="Email address"
+                      autoComplete="email"
+                      onBlur={(event) => onDelegateChange(index, "email", event.currentTarget.value.trim().toLowerCase())}
+                      value={delegate.email}
+                      readOnly={isHeadDelegate}
+                      onChange={(event) =>
+                        onDelegateChange(index, "email", event.currentTarget.value)
+                      }
+                      required
+                    />
+                    <InputField
+                      id={"delegate-" + index + "-whatsapp"}
+                      name={"delegates[" + index + "][whatsapp]"}
+                      type="tel"
+                      label="WhatsApp number"
+                      placeholder="e.g. 0300 1234567"
+                      autoComplete="tel"
+                      inputMode="tel"
+                      onBlur={(event) => onDelegateChange(index, "whatsapp", formatWhatsAppNumber(event.currentTarget.value))}
+                      pattern="\+?[0-9\s\x28\x29\x2d]{10,18}"
+                      title="Enter a valid number with country code."
+                      value={delegate.whatsapp}
+                      readOnly={isHeadDelegate}
+                      onChange={(event) =>
+                        onDelegateChange(index, "whatsapp", event.currentTarget.value)
+                      }
+                      required
+                    />
+                    <SelectField
+                      id={"delegate-" + index + "-experience"}
+                      name={"delegates[" + index + "][experience]"}
+                      label="Prior MUN experience"
+                      value={delegate.experience}
+                      onChange={(event) =>
+                        onDelegateChange(index, "experience", event.currentTarget.value)
+                      }
+                      options={experienceOptions}
+                      required
+                    />
+                  </div>
+                  <CommitteePreferences
+                    idPrefix={"delegate-" + index}
+                    firstPreference={delegate.firstPreference}
+                    secondPreference={delegate.secondPreference}
+                    onFirstPreferenceChange={(next) => {
+                      onDelegateChange(index, "firstPreference", next);
+                      if (delegate.secondPreference === next) {
+                        onDelegateChange(index, "secondPreference", "");
+                      }
+                    }}
+                    onSecondPreferenceChange={(next) =>
+                      onDelegateChange(index, "secondPreference", next)
+                    }
+                  />
+                  {value.size > MIN_DELEGATION_SIZE ? (
+                    <button
+                      className="delegate-remove-link"
+                      type="button"
                       onClick={() => {
                         focusDelegateIndex.current = Math.max(0, index - 1);
                         setAnnouncement(
@@ -198,91 +299,11 @@ export function DelegationFields({
                         onRemoveDelegate(index);
                       }}
                     >
-                      <svg
-                        aria-hidden="true"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        focusable="false"
-                      >
-                        <path d="M4.5 7h15M9 7V4.75h6V7m-8.25 0 .8 12.25h8.9L17.25 7M10 10.5v5.75m4-5.75v5.75" />
-                      </svg>
+                      Remove delegate {index + 1}
                     </button>
-                  </div>
+                  ) : null}
                 </div>
-                <div className="field-grid">
-                  <InputField
-                    id={"delegate-" + index + "-name"}
-                    name={"delegates[" + index + "][fullName]"}
-                    label="Full name"
-                    autoComplete="name"
-                    autoCapitalize="words"
-                    onBlur={(event) => onDelegateChange(index, "fullName", event.currentTarget.value.trim().replace(/\s+/g, " "))}
-                    value={delegate.fullName}
-                    readOnly={isHeadDelegate}
-                    onChange={(event) =>
-                      onDelegateChange(index, "fullName", event.currentTarget.value)
-                    }
-                    required
-                  />
-                  <InputField
-                    id={"delegate-" + index + "-email"}
-                    name={"delegates[" + index + "][email]"}
-                    type="email"
-                    label="Email address"
-                    autoComplete="email"
-                    onBlur={(event) => onDelegateChange(index, "email", event.currentTarget.value.trim().toLowerCase())}
-                    value={delegate.email}
-                    readOnly={isHeadDelegate}
-                    onChange={(event) =>
-                      onDelegateChange(index, "email", event.currentTarget.value)
-                    }
-                    required
-                  />
-                  <InputField
-                    id={"delegate-" + index + "-whatsapp"}
-                    name={"delegates[" + index + "][whatsapp]"}
-                    type="tel"
-                    label="WhatsApp number"
-                    placeholder="+92 300 1234567"
-                    autoComplete="tel"
-                    inputMode="tel"
-                    onBlur={(event) => onDelegateChange(index, "whatsapp", formatWhatsAppNumber(event.currentTarget.value))}
-                    pattern="\+?[0-9\s\x28\x29\x2d]{10,18}"
-                    title="Enter a valid number with country code."
-                    value={delegate.whatsapp}
-                    readOnly={isHeadDelegate}
-                    onChange={(event) =>
-                      onDelegateChange(index, "whatsapp", event.currentTarget.value)
-                    }
-                    required
-                  />
-                  <SelectField
-                    id={"delegate-" + index + "-experience"}
-                    name={"delegates[" + index + "][experience]"}
-                    label="Prior MUN experience"
-                    value={delegate.experience}
-                    onChange={(event) =>
-                      onDelegateChange(index, "experience", event.currentTarget.value)
-                    }
-                    options={experienceOptions}
-                    required
-                  />
-                </div>
-                <CommitteePreferences
-                  idPrefix={"delegate-" + index}
-                  firstPreference={delegate.firstPreference}
-                  secondPreference={delegate.secondPreference}
-                  onFirstPreferenceChange={(next) => {
-                    onDelegateChange(index, "firstPreference", next);
-                    if (delegate.secondPreference === next) {
-                      onDelegateChange(index, "secondPreference", "");
-                    }
-                  }}
-                  onSecondPreferenceChange={(next) =>
-                    onDelegateChange(index, "secondPreference", next)
-                  }
-                />
-              </article>
+              </details>
             );
           })}
         </div>
@@ -293,9 +314,10 @@ export function DelegationFields({
           <button
             className="button button-secondary add-delegate-button"
             type="button"
-            onClick={() =>
-              onSizeChange(Math.min(value.size + 1, MAX_DELEGATION_SIZE))
-            }
+            onClick={() => {
+              focusDelegateIndex.current = value.size;
+              onSizeChange(Math.min(value.size + 1, MAX_DELEGATION_SIZE));
+            }}
             disabled={value.size >= MAX_DELEGATION_SIZE}
           >
             {value.size >= MAX_DELEGATION_SIZE ? "Maximum reached" : "+ Add delegate"}

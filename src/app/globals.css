@@ -3761,3 +3761,317 @@ html[data-intro="pending"] .site-intro-content {
     display: none;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Card sizing and layout pass                                          */
+/* ------------------------------------------------------------------ */
+
+/* Forms: even spacing between field groups; hints no longer stretch the other column. */
+.field-grid {
+  align-items: start;
+}
+
+.field-grid + .field-grid {
+  margin-top: 16px;
+}
+
+.form-required-note {
+  margin: -8px 0 18px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 13px;
+}
+
+.form-card > .lookup-error {
+  margin-bottom: 18px;
+}
+
+/* After a failed "Review details", every invalid field is outlined, not only the first. */
+.show-field-errors .form-control:invalid {
+  border-color: rgba(229, 142, 126, 0.85);
+  box-shadow: 0 0 0 3px rgba(229, 142, 126, 0.12);
+}
+
+/* Phones zoom into inputs smaller than 16px when they are focused. */
+@media (max-width: 640px) {
+  .form-control {
+    font-size: 16px;
+  }
+}
+
+/* Delegate cards: collapsible, with a one-line summary and completion status. */
+.delegate-card {
+  padding: 0;
+}
+
+.delegate-card > summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 17px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.delegate-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.delegate-card > summary:focus-visible {
+  border-radius: 12px;
+  outline: 2px solid var(--grand-gold);
+  outline-offset: 2px;
+}
+
+.delegate-card-title {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.delegate-card-title strong {
+  color: var(--desert-sand);
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+
+.delegate-card-summary {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delegate-card .delegate-heading-actions {
+  grid-column: 3;
+  min-width: 0;
+}
+
+.delegate-status {
+  padding: 3px 8px;
+  border: 1px solid rgba(229, 142, 126, 0.45);
+  border-radius: 999px;
+  color: #f1c4bb;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.delegate-status.is-complete {
+  border-color: rgba(126, 196, 150, 0.5);
+  color: #b9e4c6;
+}
+
+.delegate-chevron {
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--dark-beige);
+  border-bottom: 2px solid var(--dark-beige);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 160ms ease;
+}
+
+.delegate-card[open] .delegate-chevron {
+  transform: rotate(-135deg) translateY(-2px);
+}
+
+.delegate-card-body {
+  padding: 4px 17px 17px;
+  border-top: 1px solid rgba(229, 204, 179, 0.1);
+}
+
+.delegate-card-body > .field-grid:first-child {
+  margin-top: 14px;
+}
+
+.delegate-remove-link {
+  margin-top: 14px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #efb3a6;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 480px) {
+  .delegate-card > summary {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 13px 14px;
+  }
+
+  .delegate-card .delegate-number {
+    display: none;
+  }
+
+  .delegate-card .delegate-heading-actions {
+    grid-column: 2;
+  }
+
+  .delegate-card .small-tag {
+    display: none;
+  }
+
+  .delegate-card-body {
+    padding: 4px 14px 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .delegate-chevron {
+    transition: none;
+  }
+}
+
+/* Sidebar progress block (steps 1–2; the fee summary takes over from step 3). */
+.registration-progress dl {
+  display: grid;
+  gap: 10px;
+  margin: 8px 0 0;
+}
+
+.registration-progress dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid rgba(229, 204, 179, 0.1);
+}
+
+.registration-progress dt {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 13px;
+}
+
+.registration-progress dd {
+  margin: 0;
+  color: var(--white);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.registration-progress-note {
+  margin: 10px 0 0;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+}
+
+/* Committee cards: equal, shorter cards; descriptions expand on demand; last row centred. */
+.committee-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 15px;
+}
+
+.committee-card {
+  min-height: 0;
+  flex: 1 1 300px;
+  max-width: calc((100% - 30px) / 3);
+}
+
+.committee-card h2 {
+  min-height: 0;
+}
+
+.committee-agenda-description {
+  min-height: 0;
+}
+
+.expandable-text {
+  margin: 0;
+}
+
+.expandable-text.is-clamped {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+}
+
+.expandable-toggle {
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--grand-gold);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (min-width: 761px) {
+  .committee-card h2 {
+    min-height: 3em;
+  }
+
+  /* Five lines plus the toggle, so cards in a row line up whatever the text length. */
+  .committee-agenda-description {
+    min-height: calc(5 * 1.75em + 26px);
+  }
+}
+
+@media (max-width: 1000px) {
+  .committee-card {
+    max-width: calc((100% - 15px) / 2);
+  }
+}
+
+@media (max-width: 640px) {
+  .committee-card {
+    max-width: 100%;
+  }
+}
+
+/* Compact page headers, shared by Register, Portal, Committees and Archive. */
+.page-compact {
+  padding-top: 36px;
+}
+
+.page-header {
+  margin-bottom: 26px;
+}
+
+.portal-page .page-header {
+  max-width: 880px;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .page-compact {
+    padding-top: 22px;
+  }
+
+  .page-header {
+    margin-bottom: 20px;
+  }
+}
+
+/* Home: the action cards come first, the ambassador callout closes the page. */
+.home-next-steps {
+  padding-bottom: 42px;
+}
+
+main > .brand-ambassador-callout:last-child {
+  margin-bottom: 86px;
+}
+
+/* Hero video blends into the page instead of sitting in a framed box. */
+.home-reveal {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  -webkit-mask-image: radial-gradient(ellipse 50% 50% at center, #000 45%, transparent 100%);
+  mask-image: radial-gradient(ellipse 50% 50% at center, #000 45%, transparent 100%);
+}

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ActionIcon } from "@/components/shared/action-icon";
 import { InputField } from "@/components/ui/form-fields";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { DelegationFields } from "@/components/registration/delegation-fields";
+import { DelegationFields, isDelegateComplete, revealAndFocus } from "@/components/registration/delegation-fields";
 import { PaymentSection } from "@/components/registration/payment-section";
 import { SoloDelegateFields } from "@/components/registration/solo-delegate-fields";
 import {
@@ -280,6 +280,9 @@ export function RegistrationFlow() {
   const [transactionId, setTransactionId] = useState("");
   const [confirmation, setConfirmation] = useState<RegistrationSuccess | null>(null);
   const [copiedApplicationId, setCopiedApplicationId] = useState(false);
+  /** Set after "Review details" finds problems, so invalid fields are outlined until fixed. */
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
+  const [invalidFieldCount, setInvalidFieldCount] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [challanInvalid, setChallanInvalid] = useState(false);
@@ -377,6 +380,7 @@ export function RegistrationFlow() {
     setFlowErrorFieldId(null);
     setSubmitError(null);
     setChallanInvalid(false);
+    setShowFieldErrors(false);
   }
 
   function editReviewField(targetId: string, targetStep = 2) {
@@ -469,14 +473,23 @@ export function RegistrationFlow() {
     });
   }
 
+  function recountInvalidFields() {
+    const fields = detailsSectionRef.current?.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input,select,textarea") ?? [];
+    setInvalidFieldCount([...fields].filter((field) => !field.checkValidity()).length);
+  }
+
   function continueToReview() {
     const fields = detailsSectionRef.current?.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input,select,textarea") ?? [];
-    const firstInvalid = [...fields].find((field) => !field.checkValidity());
-    if (firstInvalid) {
-      firstInvalid.reportValidity();
-      firstInvalid.focus();
+    const invalid = [...fields].filter((field) => !field.checkValidity());
+    setShowFieldErrors(true);
+    setInvalidFieldCount(invalid.length);
+    if (invalid.length > 0) {
+      // The first problem may be inside a collapsed delegate card; open it before pointing at it.
+      revealAndFocus(invalid[0]);
+      invalid[0].reportValidity();
       return;
     }
+    setShowFieldErrors(false);
     goToStep(3);
   }
 
@@ -738,7 +751,12 @@ export function RegistrationFlow() {
           </div>
         </section> : null}
 
-        {step === 2 ? <section className="form-card" ref={detailsSectionRef}>
+        {step === 2 ? <section
+          className={showFieldErrors ? "form-card show-field-errors" : "form-card"}
+          ref={detailsSectionRef}
+          // After a failed "Review details", keep the count of remaining problems up to date.
+          onChange={showFieldErrors ? recountInvalidFields : undefined}
+        >
           <div className="form-card-heading">
             <div className="section-heading-icon">02</div>
             <div>
@@ -746,6 +764,16 @@ export function RegistrationFlow() {
               <h2 ref={stepHeadingRef} tabIndex={-1}>{registrationType === "solo" ? "Your details" : "Your delegation"}</h2>
             </div>
           </div>
+          <p className="form-required-note">All fields are required unless marked optional.</p>
+          {showFieldErrors && invalidFieldCount > 0 ? (
+            <div className="lookup-error" role="alert">
+              <span aria-hidden="true">!</span>
+              <p>
+                {invalidFieldCount === 1 ? "1 field needs" : `${invalidFieldCount} fields need`} attention.
+                They are outlined in red{registrationType === "delegation" ? ", and their delegate cards are marked Incomplete" : ""}.
+              </p>
+            </div>
+          ) : null}
           {registrationType === "solo" ? (
             <SoloDelegateFields value={solo} onChange={handleSoloChange} />
           ) : (
@@ -901,7 +929,24 @@ export function RegistrationFlow() {
             registrationWindow={registrationWindow}
             total={reservationMatches && reservation ? reservation.amount : total}
           />
-        </div> : null}
+        </div> : (
+          <section className="sidebar-card registration-progress registration-desktop-summary" aria-label="Registration progress summary">
+            <p className="section-overline">Your registration</p>
+            <dl>
+              <div><dt>Type</dt><dd>{registrationType === "solo" ? "Solo delegate" : `Delegation of ${delegateCount}`}</dd></div>
+              {registrationType === "delegation" ? (
+                <div>
+                  <dt>Delegates complete</dt>
+                  <dd>{delegation.delegates.filter(isDelegateComplete).length} of {delegateCount}</dd>
+                </div>
+              ) : null}
+              <div><dt>{registrationWindow.name} fee</dt><dd>{formatPKR(total)}</dd></div>
+            </dl>
+            <p className="registration-progress-note">
+              Plus the {formatPKR(QUICKPAY_SERVICE_CHARGE)} KuickPay charge when you pay.
+            </p>
+          </section>
+        )}
 
         <section className="sidebar-card event-aside">
           <p className="section-overline">Conference details</p>

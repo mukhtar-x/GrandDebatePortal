@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ActionIcon } from "@/components/shared/action-icon";
+import { ExpandableText } from "@/components/shared/expandable-text";
 import Image from "next/image";
 import { COMMITTEE_DETAILS } from "@/data/committee-details";
 import { STUDY_GUIDES_PUBLISHED } from "@/data/event";
@@ -15,13 +16,9 @@ export const metadata: Metadata = {
 
 export default function CommitteesPage() {
   return (
-    <div className="page-container committee-page">
-      <div className="page-eyebrow">
-        <span className="eyebrow-dot" />
-        Five committees · Agendas announced
-      </div>
-      <header className="page-heading">
-        <p className="section-overline">Choose where to make your case</p>
+    <div className="page-container page-compact committee-page">
+      <header className="page-header registration-heading">
+        <p className="section-overline">Five committees · Agendas announced</p>
         <h1>Committees</h1>
         <p className="page-intro">
           Review each committee&apos;s agenda and character, then indicate your first and
@@ -48,21 +45,11 @@ export default function CommitteesPage() {
               <span>Agenda</span>
               <strong>{committee.agenda}</strong>
             </div>
-            <p className="committee-agenda-description">{committee.agendaDescription}</p>
+            <ExpandableText className="committee-agenda-description" text={committee.agendaDescription} />
             <p className="committee-suited">
               <strong>Suited to</strong>
               {committee.suitedTo}
             </p>
-            <dl className="committee-facts">
-              <div>
-                <dt>Level</dt>
-                <dd>To be confirmed</dd>
-              </div>
-              <div>
-                <dt>Seats</dt>
-                <dd>To be confirmed</dd>
-              </div>
-            </dl>
             {STUDY_GUIDES_PUBLISHED && committee.studyGuideHref ? (
               <a
                 className="button button-quiet committee-guide-button"

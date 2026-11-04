@@ -10,19 +10,15 @@ export const metadata: Metadata = {
 
 export default function PortalPage() {
     return (
-        <div className="page-container portal-page">
-            <div className="page-eyebrow">
-                <span className="eyebrow-dot" />
-                Delegate application portal
-            </div>
-            <div className="page-heading">
-                <p className="section-overline">Your conference journey</p>
+        <div className="page-container page-compact portal-page">
+            <header className="page-header registration-heading">
+                <p className="section-overline">Delegate application portal</p>
                 <h1>Track your application</h1>
                 <p className="page-intro">
                     Enter the email address used for registration and your application ID to see
                     your latest status.
                 </p>
-            </div>
+            </header>
 
             <PortalLookup />
         </div>

@@ -38,13 +38,9 @@ function ArchiveUpdateNote() {
 
 export default function ArchivePage() {
   return (
-    <div className="page-container archive-page">
-      <div className="page-eyebrow">
-        <span className="eyebrow-dot" />
-        Delegate resources
-      </div>
-      <header className="page-heading">
-        <p className="section-overline">Prepare for the floor</p>
+    <div className="page-container page-compact archive-page">
+      <header className="page-header registration-heading">
+        <p className="section-overline">Delegate resources</p>
         <h1>Document archive</h1>
         <p className="page-intro">
           This archive contains study guides, rules of procedure and other reference

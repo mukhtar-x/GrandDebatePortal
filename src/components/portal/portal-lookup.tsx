@@ -195,18 +195,6 @@ export function PortalLookup() {
           application={signedIn.application}
           onUpdate={(application) => setSignedIn({ ...signedIn, application })}
         />
-      ) : !error ? (
-        <div className="portal-empty-state">
-          <span className="empty-state-mark" aria-hidden="true">
-            ✦
-          </span>
-          <p className="section-overline">Your progress, in one place</p>
-          <h2>Enter your details to get started.</h2>
-          <p>
-            Enter the email address used for registration and your application ID to view
-            the status of your application.
-          </p>
-        </div>
       ) : null}
     </div>
   );

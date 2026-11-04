@@ -44,7 +44,6 @@ export function CommitteePreferences({
         onChange={(event) => onSecondPreferenceChange(event.currentTarget.value)}
         options={secondOptions}
         required
-        hint="Choose a different committee from your first preference."
       />
     </div>
   );

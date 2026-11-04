@@ -47,7 +47,7 @@ export function SoloDelegateFields({ value, onChange }: SoloDelegateFieldsProps)
           name="whatsapp"
           type="tel"
           label="WhatsApp number"
-          placeholder="+92 300 1234567"
+          placeholder="e.g. 0300 1234567"
           autoComplete="tel"
           inputMode="tel"
           onBlur={(event) => onChange("whatsapp", formatWhatsAppNumber(event.currentTarget.value))}

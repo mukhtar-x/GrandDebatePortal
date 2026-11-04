@@ -72,6 +72,32 @@ export default function Home() {
           </div>
         </section>
 
+        <section className="home-next-steps" aria-labelledby="home-next-title">
+          <div className="home-section-heading">
+            <p className="section-overline">Your conference journey</p>
+            <h2 id="home-next-title">Where would you like to begin?</h2>
+          </div>
+
+          <div className="home-action-grid">
+            <Link className="home-action-card" href="/register">
+              <span className="home-card-number">01</span>
+              <span className="home-card-title">Join the debate</span>
+              <span className="home-card-copy">
+                Register as a solo delegate or bring a delegation of 4–7 students.
+              </span>
+              <span className="home-card-link">Explore registration <ActionIcon /></span>
+            </Link>
+            <Link className="home-action-card" href="/portal">
+              <span className="home-card-number">02</span>
+              <span className="home-card-title">Check your status</span>
+              <span className="home-card-copy">
+                Look up an existing application and follow its review progress.
+              </span>
+              <span className="home-card-link">Open application portal <ActionIcon /></span>
+            </Link>
+          </div>
+        </section>
+
         <section className="brand-ambassador-callout" aria-labelledby="brand-ambassador-title">
           <div className="brand-ambassador-copy">
             <div className="brand-ambassador-heading">
@@ -97,32 +123,6 @@ export default function Home() {
           >
             Register as Brand Ambassador <ActionIcon direction="up-right" />
           </a>
-        </section>
-
-        <section className="home-next-steps" aria-labelledby="home-next-title">
-          <div className="home-section-heading">
-            <p className="section-overline">Your conference journey</p>
-            <h2 id="home-next-title">Where would you like to begin?</h2>
-          </div>
-
-          <div className="home-action-grid">
-            <Link className="home-action-card" href="/register">
-              <span className="home-card-number">01</span>
-              <span className="home-card-title">Join the debate</span>
-              <span className="home-card-copy">
-                Register as a solo delegate or bring a delegation of 4–7 students.
-              </span>
-              <span className="home-card-link">Explore registration <ActionIcon /></span>
-            </Link>
-            <Link className="home-action-card" href="/portal">
-              <span className="home-card-number">02</span>
-              <span className="home-card-title">Check your status</span>
-              <span className="home-card-copy">
-                Look up an existing application and follow its review progress.
-              </span>
-              <span className="home-card-link">Open application portal <ActionIcon /></span>
-            </Link>
-          </div>
         </section>
       </main>
       <SiteFooter />
