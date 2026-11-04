@@ -5,7 +5,12 @@ import type { RegistrationDetails } from "@/lib/registrationInput";
 import Challan, { type ChallanCategory } from "@/models/Challan";
 import ChallanIssue from "@/models/ChallanIssue";
 
+/** How long an applicant has to pay and submit with a challan. */
 export const CHALLAN_RESERVATION_MS = 30 * 60 * 1000;
+/**
+ * After the reservation ends the challan can no longer be submitted, but it stays out of the
+ * pool for this long in case a late payment is still on its way.
+ */
 export const CHALLAN_GRACE_MS = 15 * 60 * 1000;
 export const CHALLAN_ENVIRONMENT: "test" | "live" = process.env.CHALLAN_MODE === "test"
     ? "test"
@@ -208,9 +213,9 @@ export async function recordSubmittedChallan(input: {
         ],
     })
         .sort({ reservedAt: 1 })
-        .select("_id challanNumber status graceUntil")
+        .select("_id challanNumber status expiresAt")
         .session(session)
-        .lean<Array<{ _id: Types.ObjectId; challanNumber: string; status: string; graceUntil: Date }>>();
+        .lean<Array<{ _id: Types.ObjectId; challanNumber: string; status: string; expiresAt: Date }>>();
     if (earlier.length === 0) return [];
 
     await ChallanIssue.updateMany(
@@ -218,7 +223,7 @@ export async function recordSubmittedChallan(input: {
         { $set: { linkedApplicationId: applicationId } },
         { session },
     );
-    const stillHeld = earlier.filter((issue) => issue.status === "Active" && new Date(issue.graceUntil) > now);
+    const stillHeld = earlier.filter((issue) => issue.status === "Active" && new Date(issue.expiresAt) > now);
     if (stillHeld.length > 0) {
         const ids = stillHeld.map(({ _id }) => _id);
         await ChallanIssue.updateMany({ _id: { $in: ids } }, { $set: { status: "Superseded", endedAt: now } }, { session });

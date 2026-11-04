@@ -191,15 +191,15 @@ await test("challan details: category and amount include the delegation fee", ()
     assert.equal(getChallanDetails("delegation", 3), null);
     assert.equal(getChallanDetails("solo", 1, new Date("2026-11-19T00:00:00+05:00")), null);
 });
-await test("challan reuse: unused first, grace period respected, history status derived", () => {
+await test("challan reuse: unused first, grace period respected, expiry after 30 minutes", () => {
     assert.deepEqual(Object.keys(CHALLAN_ISSUE_ORDER), ["issueCount", "graceUntil", "challanNumber"]);
     const now = new Date("2026-11-05T12:00:00+05:00");
     const filter = reusableChallanFilter(now);
     assert.deepEqual(filter.$or[0], { status: "Available" });
     assert.deepEqual(filter.$or[1], { status: { $in: ["Reserved", "Expired"] }, graceUntil: { $lte: now } });
-    assert.equal(challanIssueStatus({ status: "Active", graceUntil: new Date(now.getTime() - 1) }, now), "Expired");
-    assert.equal(challanIssueStatus({ status: "Active", graceUntil: new Date(now.getTime() + 1) }, now), "Active");
-    assert.equal(challanIssueStatus({ status: "Submitted", graceUntil: new Date(now.getTime() - 1) }, now), "Submitted");
+    assert.equal(challanIssueStatus({ status: "Active", expiresAt: new Date(now.getTime() - 1) }, now), "Expired");
+    assert.equal(challanIssueStatus({ status: "Active", expiresAt: new Date(now.getTime() + 1) }, now), "Active");
+    assert.equal(challanIssueStatus({ status: "Submitted", expiresAt: new Date(now.getTime() - 1) }, now), "Submitted");
     const issueIndexes = ChallanIssue.schema.indexes() as Array<[Record<string, unknown>, Record<string, unknown>]>;
     assert.ok(issueIndexes.some(([fields]) => fields.challanNumber === 1 && fields.reservedAt === 1));
     assert.ok(Payment.schema.path("otherChallanNumbers"), "Payment must record earlier challan numbers.");

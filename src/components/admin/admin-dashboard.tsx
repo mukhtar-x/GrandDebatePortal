@@ -96,6 +96,7 @@ interface ChallanHistory {
         delegateCount: number;
         baCode?: string;
         reservedAt: string;
+        expiresAt: string;
         graceUntil: string;
         endedAt?: string;
         applicationId?: string;
@@ -968,13 +969,14 @@ function ChallanHistoryPanel({ history, submittedFor }: { history: ChallanHistor
             </div>
             {history.issues.length === 0 ? <p className="admin-muted">No issue records exist for this challan (it was issued before history was recorded, or never issued).</p> : (
                 <div className="admin-roster-table"><table>
-                    <thead><tr><th>#</th><th>Held by</th><th>Institution</th><th>Reserved</th><th>Grace ends</th><th>Outcome</th><th>Application</th></tr></thead>
+                    <thead><tr><th>#</th><th>Held by</th><th>Institution</th><th>Reserved</th><th>Submit by</th><th>Back in pool</th><th>Outcome</th><th>Application</th></tr></thead>
                     <tbody>{history.issues.map((issue) => (
                         <tr key={issue.issueNumber}>
                             <td>{issue.issueNumber}</td>
                             <td><strong>{issue.contactName}</strong><span className="admin-cell-sub">{issue.contactEmail}</span><span className="admin-cell-sub">{issue.contactWhatsapp}</span></td>
                             <td>{issue.institution}<span className="admin-cell-sub">{issue.participantType === "solo" ? "Solo" : `Delegation of ${issue.delegateCount}`}{issue.baCode ? ` · BA ${issue.baCode}` : ""}</span></td>
                             <td>{formatDateTime(issue.reservedAt)}</td>
+                            <td>{formatDateTime(issue.expiresAt)}</td>
                             <td>{formatDateTime(issue.graceUntil)}</td>
                             <td><strong>{issue.status}</strong>{issue.endedAt && <span className="admin-cell-sub">{formatDateTime(issue.endedAt)}</span>}</td>
                             <td>{issue.applicationId ?? (issue.linkedApplicationId ? <>{issue.linkedApplicationId}<span className="admin-cell-sub">submitted a later challan</span></> : "—")}</td>

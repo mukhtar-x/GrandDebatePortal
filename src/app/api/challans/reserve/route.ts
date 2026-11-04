@@ -109,7 +109,7 @@ export async function POST(request: Request): Promise<Response> {
             environment: CHALLAN_ENVIRONMENT,
             reservationContactHash: contactHash,
             status: "Reserved",
-            graceUntil: { $gt: now },
+            expiresAt: { $gt: now },
         }).select("_id challanNumber amount rateType category expiresAt graceUntil +registrationFingerprint +reservationTokenHash")
             .lean<ReservationView & { _id: unknown; registrationFingerprint?: string; reservationTokenHash?: string }>();
 
@@ -123,7 +123,7 @@ export async function POST(request: Request): Promise<Response> {
         } else if (held && held.reservationTokenHash !== previousTokenHash) {
             return Response.json({
                 success: false,
-                error: `Challan ${held.challanNumber} is already reserved for this email with different details. Continue with that challan, or generate a new one after ${pktTime(new Date(held.graceUntil))}.`,
+                error: `Challan ${held.challanNumber} is already reserved for this email with different details. Continue with that challan, or generate a new one after ${pktTime(new Date(held.expiresAt))}.`,
                 code: "CHALLAN_HELD",
             }, { status: 409 });
         }
@@ -131,7 +131,7 @@ export async function POST(request: Request): Promise<Response> {
         const activeOnNetwork = await ChallanIssue.countDocuments({
             ipHash,
             status: "Active",
-            graceUntil: { $gt: now },
+            expiresAt: { $gt: now },
             environment: CHALLAN_ENVIRONMENT,
         });
         if (activeOnNetwork >= MAX_ACTIVE_PER_IP + (previousTokenHash ? 1 : 0)) {
@@ -139,9 +139,10 @@ export async function POST(request: Request): Promise<Response> {
         }
 
         const challan = await withTransaction(async (session) => {
-            // Lets this email reserve again if its last reservation lapsed without being reclaimed.
+            // After 30 minutes a reservation can no longer be submitted, so this email may reserve
+            // again. The old challan keeps its graceUntil and stays out of the pool until then.
             await Challan.updateMany(
-                { environment: CHALLAN_ENVIRONMENT, reservationContactHash: contactHash, status: "Reserved", graceUntil: { $lte: now } },
+                { environment: CHALLAN_ENVIRONMENT, reservationContactHash: contactHash, status: "Reserved", expiresAt: { $lte: now } },
                 { $set: { status: "Expired" }, $unset: { reservationTokenHash: 1, registrationFingerprint: 1, reservationContactHash: 1 } },
                 { session },
             );

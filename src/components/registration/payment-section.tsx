@@ -1,6 +1,6 @@
 import { useState, type Ref } from "react";
 import { InputField } from "@/components/ui/form-fields";
-import { DELEGATION_FEE, RECEIPT_MAX_BYTES, RECEIPT_TYPES, formatPKR } from "@/data/event";
+import { DELEGATION_FEE, EVENT_DETAILS, RECEIPT_MAX_BYTES, RECEIPT_TYPES, formatPKR } from "@/data/event";
 import type { ChallanReservation } from "@/lib/api/registration";
 
 interface PaymentSectionProps {
@@ -20,7 +20,7 @@ interface PaymentSectionProps {
 
 const MAX_TRANSACTION_ID_LENGTH = 64;
 
-type Phase = "loading" | "reserved" | "grace" | "expired";
+type Phase = "loading" | "reserved" | "expired";
 
 function formatCountdown(ms: number) {
   const seconds = Math.max(0, Math.ceil(ms / 1000));
@@ -55,8 +55,7 @@ export function PaymentSection({
   const [copied, setCopied] = useState(false);
 
   const expiresAt = reservation ? Date.parse(reservation.expiresAt) : 0;
-  const graceUntil = reservation ? Date.parse(reservation.graceUntil) : 0;
-  const phase: Phase = now === 0 ? "loading" : now < expiresAt ? "reserved" : now < graceUntil ? "grace" : "expired";
+  const phase: Phase = now === 0 ? "loading" : now < expiresAt ? "reserved" : "expired";
   const delegationFee = delegateCount > 1 ? DELEGATION_FEE : 0;
   const perDelegate = reservation ? (reservation.amount - delegationFee) / delegateCount : 0;
 
@@ -123,7 +122,10 @@ export function PaymentSection({
               <>
                 <div>
                   <strong>This challan has expired.</strong>
-                  <span>Do not pay challan {reservation.challanNumber}. Generate a new challan to continue.</span>
+                  <span>
+                    Do not pay challan {reservation.challanNumber}. Generate a new challan to continue.
+                    If you already paid it, contact the organisers at {EVENT_DETAILS.contactEmail} with your receipt.
+                  </span>
                 </div>
                 <button className="button button-primary" type="button" onClick={onRegenerate} disabled={regenerating} aria-busy={regenerating}>
                   {regenerating ? "Generating…" : "Generate new challan"}
@@ -132,19 +134,15 @@ export function PaymentSection({
             ) : (
               <>
                 <div>
-                  <strong>{phase === "grace" ? "Grace period: submit now" : "Time left to pay and submit"}</strong>
-                  <span>
-                    {phase === "grace"
-                      ? "The 30-minute window has ended. You can still submit your receipt until the timer runs out."
-                      : "A 15-minute grace period follows if you need a little longer."}
-                  </span>
+                  <strong>Time left to pay and submit</strong>
+                  <span>When the timer ends, this challan can no longer be submitted.</span>
                 </div>
-                <span className="challan-countdown">{phase === "loading" ? "--:--" : formatCountdown((phase === "reserved" ? expiresAt : graceUntil) - now)}</span>
+                <span className="challan-countdown">{phase === "loading" ? "--:--" : formatCountdown(expiresAt - now)}</span>
               </>
             )}
           </div>
           <p className="visually-hidden" aria-live="polite">
-            {phase === "grace" ? "The grace period has started. Submit your receipt now." : phase === "expired" ? "The challan has expired." : ""}
+            {phase === "expired" ? "The challan has expired." : ""}
           </p>
 
           <ol className="payment-steps">

@@ -75,9 +75,9 @@ function clearStoredDraft() {
   }
 }
 
-/** True while the challan can still be submitted (before its grace period ends). */
+/** True while the challan can still be submitted (within its 30-minute reservation). */
 function isReservationLive(reservation: ChallanReservation | null, at = Date.now()) {
-  return reservation !== null && at < Date.parse(reservation.graceUntil);
+  return reservation !== null && at < Date.parse(reservation.expiresAt);
 }
 
 /** Ticks once a second while active; returns 0 until the first tick. */
@@ -247,7 +247,7 @@ export function RegistrationFlow() {
   const total = delegateCount * registrationWindow.feePerDelegate + (delegateCount > 1 ? DELEGATION_FEE : 0);
   const reservationMatches = reservation !== null && reservedKey === detailsKey;
   const checkedAt = now || stepEnteredAt;
-  const reservationLive = reservation !== null && checkedAt > 0 && checkedAt < Date.parse(reservation.graceUntil);
+  const reservationLive = reservation !== null && checkedAt > 0 && checkedAt < Date.parse(reservation.expiresAt);
   const expired = reservation !== null && now > 0 && !reservationLive;
 
   useEffect(() => {

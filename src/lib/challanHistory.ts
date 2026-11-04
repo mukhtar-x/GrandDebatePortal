@@ -23,6 +23,7 @@ export interface ChallanHistory {
         delegateCount: number;
         baCode?: string;
         reservedAt: Date;
+        expiresAt: Date;
         graceUntil: Date;
         endedAt?: Date;
         applicationId?: string;
@@ -71,6 +72,7 @@ export async function loadChallanHistories(challanNumbers: string[]): Promise<Ch
                 delegateCount: issue.delegateEmails.length,
                 baCode: issue.baCode,
                 reservedAt: issue.reservedAt,
+                expiresAt: issue.expiresAt,
                 graceUntil: issue.graceUntil,
                 endedAt: issue.endedAt,
                 applicationId: issue.applicationId,

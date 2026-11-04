@@ -1475,15 +1475,6 @@ textarea.form-control {
   font-weight: 700;
 }
 
-.challan-timer.is-grace {
-  border-color: rgba(232, 178, 92, 0.65);
-  background: rgba(201, 140, 40, 0.16);
-}
-
-.challan-timer.is-grace .challan-countdown {
-  color: #f3c46b;
-}
-
 .challan-timer.is-expired {
   border-color: rgba(229, 142, 126, 0.55);
   background: rgba(150, 58, 58, 0.16);

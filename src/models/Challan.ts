@@ -5,10 +5,11 @@ export type ChallanCategory = (typeof CHALLAN_CATEGORIES)[number];
 export type ChallanRate = "Early bird" | "Regular";
 
 /**
- * Available: never issued. Reserved: held by an applicant until graceUntil.
- * Expired: released early by the applicant; still held until graceUntil.
+ * Available: never issued. Reserved: the applicant can submit with it until expiresAt.
+ * Expired: released or past expiresAt; no longer submittable.
  * Submitted: used by an application; never issued again.
- * A Reserved or Expired challan whose graceUntil has passed can be issued again.
+ * A Reserved or Expired challan is issued again only once graceUntil (expiresAt + 15 minutes)
+ * has passed, so a late payment never lands on a challan already given to someone else.
  */
 export interface IChallan {
     challanNumber: string;

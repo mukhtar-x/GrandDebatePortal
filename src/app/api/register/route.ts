@@ -207,7 +207,8 @@ export async function POST(request: Request): Promise<Response> {
     let pricingResult: ReturnType<typeof calculatePricingAtRate>;
     try {
         // Checked before the receipt is processed and stored, so a stale challan fails fast.
-        const reservedChallan = await Challan.findOne({ ...reservedChallanFilter, graceUntil: { $gt: new Date() } })
+        // Submission is accepted only within the 30-minute reservation, not the grace period after it.
+        const reservedChallan = await Challan.findOne({ ...reservedChallanFilter, expiresAt: { $gt: new Date() } })
             .select("category rateType amount")
             .lean<{ category: string; rateType: Pricing["rateType"]; amount: number }>();
         if (!reservedChallan) return challanInvalidResponse();
@@ -256,7 +257,7 @@ export async function POST(request: Request): Promise<Response> {
             const now = new Date();
             const challan = await Challan.findOneAndUpdate({
                 ...reservedChallanFilter,
-                graceUntil: { $gt: now },
+                expiresAt: { $gt: now },
                 amount: pricingResult.pricing.totalPayable,
                 rateType: pricingResult.pricing.rateType,
             }, {

@@ -2,8 +2,8 @@ import mongoose, { Schema, type Types } from "mongoose";
 import { CHALLAN_CATEGORIES, type ChallanCategory, type ChallanRate } from "@/models/Challan";
 
 /**
- * Stored status. "Active" past its grace period is reported as "Expired" by challanIssueStatus;
- * it is not rewritten, so the record keeps the exact times the challan was held.
+ * Stored status. "Active" past its 30-minute reservation is reported as "Expired" by
+ * challanIssueStatus; it is not rewritten, so the record keeps the exact times.
  */
 export const CHALLAN_ISSUE_STATUSES = ["Active", "Released", "Superseded", "Submitted"] as const;
 export type ChallanIssueStatus = (typeof CHALLAN_ISSUE_STATUSES)[number];
@@ -30,7 +30,9 @@ export interface IChallanIssue {
     ipHash: string;
     status: ChallanIssueStatus;
     reservedAt: Date;
+    /** Last moment the applicant could submit with this challan. */
     expiresAt: Date;
+    /** When the challan could go back into the pool (15 minutes after expiresAt). */
     graceUntil: Date;
     endedAt?: Date;
     /** Set when this challan was submitted with the application. */
@@ -71,10 +73,10 @@ challanIssueSchema.index({ applicationId: 1 }, { sparse: true });
 challanIssueSchema.index({ linkedApplicationId: 1 }, { sparse: true });
 challanIssueSchema.index({ draftId: 1 }, { sparse: true });
 challanIssueSchema.index({ contactEmail: 1, reservedAt: -1 });
-challanIssueSchema.index({ ipHash: 1, status: 1, graceUntil: 1 });
+challanIssueSchema.index({ ipHash: 1, status: 1, expiresAt: 1 });
 
-export function challanIssueStatus(issue: Pick<IChallanIssue, "status" | "graceUntil">, now = new Date()) {
-    return issue.status === "Active" && new Date(issue.graceUntil) <= now ? "Expired" : issue.status;
+export function challanIssueStatus(issue: Pick<IChallanIssue, "status" | "expiresAt">, now = new Date()) {
+    return issue.status === "Active" && new Date(issue.expiresAt) <= now ? "Expired" : issue.status;
 }
 
 const ChallanIssue = mongoose.models.ChallanIssue ?? mongoose.model<IChallanIssue>("ChallanIssue", challanIssueSchema);

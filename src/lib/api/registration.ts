@@ -176,7 +176,7 @@ export async function releaseChallan(reservationToken: string) {
       body: JSON.stringify({ reservationToken }),
     });
   } catch {
-    // Any lost release request is recovered when the reservation grace period elapses.
+    // A lost release request is harmless: the challan returns to the pool after its grace period anyway.
   }
 }
 

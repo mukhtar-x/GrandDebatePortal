@@ -207,10 +207,13 @@ remains the decision-maker.
 
 ### Challan inventory
 
-Registration reserves a category- and rate-specific challan for 30 minutes, then accepts
-receipt submission during a further 15-minute grace period. A challan only becomes available
-to anyone else once that grace period has ended, including when the applicant changes their
-details or starts over early. Unused challans are always issued first; once none are left,
+The full challan workflow is described in [`docs/challan-workflow.md`](./docs/challan-workflow.md).
+
+Registration reserves a category- and rate-specific challan for 30 minutes; the applicant must
+pay and submit within that time. After it, the challan can no longer be submitted, but it stays
+out of the pool for a further 15-minute grace period in case a late payment arrives. It only
+becomes available to anyone else after that grace period, including when the applicant
+changes their details or starts over early. Unused challans are always issued first; once none are left,
 the least reused challan whose grace period ended longest ago is issued.
 
 - Generating again with the same email and the same details (for example after a refresh)
@@ -410,5 +413,6 @@ script against a production database.
 
 ## Related documentation
 
+- [`docs/challan-workflow.md`](./docs/challan-workflow.md) — challan reservation, reuse, history and admin tools.
 - [`src/README.md`](./src/README.md) — frontend/source-level notes.
 - [`AGENTS.md`](./AGENTS.md) — repository-specific development instructions.
