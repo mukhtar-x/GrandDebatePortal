@@ -38,6 +38,7 @@ interface ApplicationRow {
     applicationId: string;
     participantType: "solo" | "delegation";
     institution?: string;
+    baCode?: string;
     contactName?: string;
     contactEmail?: string;
     status: string;
@@ -45,6 +46,9 @@ interface ApplicationRow {
     payment?: {
         paymentStatus?: PaymentStatus;
         totalPayable?: number;
+        delegationFee?: number;
+        challanNumber?: string;
+        challanEnvironment?: "test" | "live";
         transactionId?: string;
         receiptFileId?: string;
         receiptMime?: string;
@@ -88,6 +92,33 @@ interface AvailableDelegate {
     secondPreference: string;
 }
 
+interface AllocatedDelegate extends DelegateSummary {
+    id: string;
+    applicationId: string;
+    participantType: "solo" | "delegation";
+    institution?: string;
+    baCode?: string;
+    whatsappNumber?: string;
+    experienceLevel?: string;
+    firstPreference?: string;
+    secondPreference?: string;
+}
+
+interface AmbassadorSummary {
+    code: string;
+    soloApplications: number;
+    delegationApplications: number;
+    soloDelegates: number;
+    delegationDelegates: number;
+    allocatedDelegates: number;
+}
+
+interface AmbassadorAllocation {
+    committee: string;
+    baCode: string;
+    delegates: number;
+}
+
 interface DashboardData {
     metrics: Metrics | null;
     applications: ApplicationRow[];
@@ -96,6 +127,9 @@ interface DashboardData {
     pendingChecks: number;
     committees: Committee[];
     unallocatedDelegates: AvailableDelegate[];
+    allocatedDelegates: AllocatedDelegate[];
+    ambassadors: AmbassadorSummary[];
+    ambassadorAllocations: AmbassadorAllocation[];
 }
 
 interface ApiResult {
@@ -112,6 +146,9 @@ const EMPTY_DATA: DashboardData = {
     pendingChecks: 0,
     committees: [],
     unallocatedDelegates: [],
+    allocatedDelegates: [],
+    ambassadors: [],
+    ambassadorAllocations: [],
 };
 
 const APPLICATION_STAGES = [
@@ -150,7 +187,9 @@ export default function AdminDashboard() {
     const [loginBusy, setLoginBusy] = useState(false);
     const [error, setError] = useState("");
     const [toast, setToast] = useState("");
-    const [activeView, setActiveView] = useState<"applications" | "committees">("applications");
+    const [activeView, setActiveView] = useState<"applications" | "committees" | "ambassadors">("applications");
+    const [allocatedQuery, setAllocatedQuery] = useState("");
+    const [allocatedCommittee, setAllocatedCommittee] = useState("");
     const [query, setQuery] = useState("");
     const [stage, setStage] = useState("");
     const [participantType, setParticipantType] = useState("");
@@ -186,18 +225,19 @@ export default function AdminDashboard() {
         if (risk) params.set("risk", risk);
         if (sort) params.set("sort", sort);
         try {
-            const [overviewResponse, applicationResponse, committeeResponse] = await Promise.all([
+            const [overviewResponse, applicationResponse, committeeResponse, ambassadorResponse] = await Promise.all([
                 fetch("/api/admin/overview", { cache: "no-store" }),
                 fetch(`/api/admin/applications?${params}`, { cache: "no-store" }),
                 fetch("/api/admin/committees", { cache: "no-store" }),
+                fetch("/api/admin/brand-ambassadors", { cache: "no-store" }),
             ]);
             if (requestId !== dashboardRequestId.current) return;
-            if ([overviewResponse, applicationResponse, committeeResponse].some((response) => response.status === 401)) {
+            if ([overviewResponse, applicationResponse, committeeResponse, ambassadorResponse].some((response) => response.status === 401)) {
                 setAuthenticated(false);
                 setError("Your admin session has expired. Sign in again to continue.");
                 return;
             }
-            const [overview, applications, committees] = await Promise.all([
+            const [overview, applications, committees, ambassadorData] = await Promise.all([
                 jsonResponse<ApiResult & { metrics?: Metrics }>(overviewResponse),
                 jsonResponse<
                     ApiResult & {
@@ -213,15 +253,16 @@ export default function AdminDashboard() {
                         unallocatedDelegates?: AvailableDelegate[];
                     }
                 >(committeeResponse),
+                jsonResponse<ApiResult & { ambassadors?: AmbassadorSummary[]; allocations?: AmbassadorAllocation[] }>(ambassadorResponse),
             ]);
-            if (!overviewResponse.ok || !applicationResponse.ok || !committeeResponse.ok) {
+            if (!overviewResponse.ok || !applicationResponse.ok || !committeeResponse.ok || !ambassadorResponse.ok) {
                 throw new Error(
                     responseError(
                         !overviewResponse.ok
                             ? overview
                             : !applicationResponse.ok
                               ? applications
-                              : committees,
+                              : !committeeResponse.ok ? committees : ambassadorData,
                         "Dashboard data could not be loaded.",
                     ),
                 );
@@ -234,6 +275,9 @@ export default function AdminDashboard() {
                 pendingChecks: applications.pendingChecks ?? 0,
                 committees: committees.committees ?? [],
                 unallocatedDelegates: committees.unallocatedDelegates ?? [],
+                allocatedDelegates: (committees.allocatedDelegates as AllocatedDelegate[] | undefined) ?? [],
+                ambassadors: ambassadorData.ambassadors ?? [],
+                ambassadorAllocations: ambassadorData.allocations ?? [],
             });
         } catch (requestError) {
             if (requestId === dashboardRequestId.current) {
@@ -597,7 +641,8 @@ export default function AdminDashboard() {
 
                 <div className="admin-tabs" role="tablist" aria-label="Dashboard views">
                     <button className={activeView === "applications" ? "is-active" : ""} type="button" role="tab" aria-selected={activeView === "applications"} onClick={() => setActiveView("applications")}>Applications</button>
-                    <button className={activeView === "committees" ? "is-active" : ""} type="button" role="tab" aria-selected={activeView === "committees"} onClick={() => setActiveView("committees")}>Committee allocation</button>
+                    <button className={activeView === "committees" ? "is-active" : ""} type="button" role="tab" aria-selected={activeView === "committees"} onClick={() => setActiveView("committees")}>Committee allocations</button>
+                    <button className={activeView === "ambassadors" ? "is-active" : ""} type="button" role="tab" aria-selected={activeView === "ambassadors"} onClick={() => setActiveView("ambassadors")}>Brand ambassadors</button>
                 </div>
 
                 {activeView === "applications" ? (
@@ -644,7 +689,7 @@ export default function AdminDashboard() {
                         ) : (
                             <div className="admin-table-wrap">
                                 <table className="admin-table">
-                                    <thead><tr><th>Application</th><th>Contact / institution</th><th>Delegates</th><th>Stage</th><th>Payment</th><th>Actions</th></tr></thead>
+                                    <thead><tr><th>Application</th><th>Contact / institution</th><th>BA code</th><th>Delegates</th><th>Stage</th><th>Payment</th><th>Actions</th></tr></thead>
                                     <tbody>
                                         {data.applications.map((application) => (
                                             <ApplicationRows
@@ -676,7 +721,7 @@ export default function AdminDashboard() {
                             <div><button className="admin-button admin-button-outline" type="button" disabled={page <= 1 || loading} onClick={() => setPage((current) => current - 1)}>Previous</button><span>Page {page} of {totalPages}</span><button className="admin-button admin-button-outline" type="button" disabled={page >= totalPages || loading} onClick={() => setPage((current) => current + 1)}>Next</button></div>
                         </div>
                     </section>
-                ) : (
+                ) : activeView === "committees" ? (
                     <section className="admin-allocation-view">
                         <div className="admin-panel-heading"><div><p className="admin-eyebrow">Seat planning</p><h2>Committee capacity</h2></div><p className="admin-muted">Unassigned delegates with confirmed payments are available for placement.</p></div>
                         {data.committees.length === 0 ? <div className="admin-empty"><strong>No committee data available</strong><p>Refresh the dashboard or check the database connection.</p></div> : (
@@ -711,7 +756,20 @@ export default function AdminDashboard() {
                                 </div>
                             )}
                         </div>
+                        <section className="admin-panel">
+                            <div className="admin-panel-heading"><div><p className="admin-eyebrow">Live placements</p><h2>Allocated delegates</h2></div><span className="admin-count">{data.allocatedDelegates.length}</span></div>
+                            <div className="admin-allocation-filters">
+                                <label className="admin-search"><span aria-hidden="true">⌕</span><input aria-label="Search allocated delegates" placeholder="Search name, email, application or BA code" value={allocatedQuery} onChange={(event) => setAllocatedQuery(event.target.value)} /></label>
+                                <select aria-label="Filter allocated delegates by committee" value={allocatedCommittee} onChange={(event) => setAllocatedCommittee(event.target.value)}><option value="">All committees</option>{data.committees.map((committee) => <option key={committee.code} value={committee.code}>{committee.code}</option>)}</select>
+                            </div>
+                            <AllocatedDelegatesTable delegates={data.allocatedDelegates.filter((delegate) => {
+                                const search = allocatedQuery.trim().toLowerCase();
+                                return (!allocatedCommittee || delegate.assignedCommittee === allocatedCommittee) && (!search || [delegate.fullName, delegate.email, delegate.applicationId, delegate.baCode, delegate.institution, delegate.assignedPortfolio].some((value) => value?.toLowerCase().includes(search)));
+                            })} />
+                        </section>
                     </section>
+                ) : (
+                    <BrandAmbassadorsView ambassadors={data.ambassadors} allocations={data.ambassadorAllocations} />
                 )}
                 <p className="admin-disclaimer">When a receipt needs correction, send an action request with a reason. The head delegate uploads the replacement screenshot from the application status page; organisers review it here and do not upload receipts.</p>
             </div>
@@ -765,11 +823,13 @@ function ApplicationRows({
         <tr>
             <td><strong className="admin-application-id">{application.applicationId}</strong><span className="admin-cell-sub">{application.participantType === "solo" ? "Solo" : "Delegation"} · {new Date(application.createdAt).toLocaleDateString()}</span></td>
             <td><strong>{application.contactName || "Contact not set"}</strong><span className="admin-cell-sub">{application.contactEmail || "Email not set"}</span><span className="admin-cell-sub">{application.institution || "Institution not set"}</span></td>
+            <td>{application.baCode || <span className="admin-cell-sub">Unattributed</span>}</td>
             <td>{application.delegates?.length ?? "—"}<span className="admin-cell-sub">{application.delegates?.filter((delegate) => delegate.assignedCommittee).length ?? 0} allocated</span></td>
             <td><span className="admin-status-badge">{application.status || "Unknown"}</span></td>
             <td>
                 <strong>{displayPaymentStatus(application.payment?.paymentStatus)}</strong>
                 <span className="admin-cell-sub">{typeof application.payment?.totalPayable === "number" ? formatMoney(application.payment.totalPayable) : "—"}</span>
+                {application.payment?.challanNumber && <span className="admin-cell-sub">Challan: {application.payment.challanNumber}{application.payment.challanEnvironment === "test" ? " · TEST" : ""}</span>}
                 {application.payment?.transactionId && <span className="admin-cell-sub">Txn: {application.payment.transactionId}</span>}
                 {application.payment?.reviewReason && <span className="admin-cell-sub admin-reason">{application.payment.reviewReason}</span>}
                 {application.payment?.analysis && <span className={`admin-risk-badge risk-${application.payment.analysis.riskLevel}`}>{application.payment.analysis.riskLevel} risk · {application.payment.analysis.riskScore}</span>}
@@ -781,9 +841,9 @@ function ApplicationRows({
                 {application.payment?.receiptFileId && <button type="button" className="admin-button admin-button-small admin-button-outline" disabled={receiptBusy === application.applicationId} onClick={onReanalyze}>{receiptBusy === application.applicationId ? "Analyzing…" : "Re-run check"}</button>}
             </div></td>
         </tr>
-        {reasonFor === application.applicationId && <tr className="admin-expanded-row"><td colSpan={6}><form className="admin-reason-form" onSubmit={onReasonSubmit}><strong>Ask the applicant for a clearer or corrected screenshot</strong><p>The reason below is sent to the head delegate. They upload the replacement from their application status page; you review it here.</p><label htmlFor={`reason-${application.applicationId}`}>Message to the applicant</label><textarea id={`reason-${application.applicationId}`} value={reason} onChange={(event) => onReasonChange(event.target.value)} minLength={3} maxLength={500} required placeholder="For example: The screenshot is unclear. Please upload a clearer payment receipt." /><button className="admin-button admin-button-warning" type="submit" disabled={busy}>{busy ? "Sending…" : "Send request to applicant"}</button></form></td></tr>}
-        {application.payment?.paymentStatus === "Action Required" && <tr className="admin-expanded-row"><td colSpan={6}><div className="admin-applicant-action-note"><strong>Waiting for the applicant’s replacement screenshot</strong><span>The head delegate uploads it from the application status page. The new receipt will appear here for organiser review.</span></div></td></tr>}
-        {detail && <tr className="admin-expanded-row"><td colSpan={6}>
+        {reasonFor === application.applicationId && <tr className="admin-expanded-row"><td colSpan={7}><form className="admin-reason-form" onSubmit={onReasonSubmit}><strong>Ask the applicant for a clearer or corrected screenshot</strong><p>The reason below is sent to the head delegate. They upload the replacement from their application status page; you review it here.</p><label htmlFor={`reason-${application.applicationId}`}>Message to the applicant</label><textarea id={`reason-${application.applicationId}`} value={reason} onChange={(event) => onReasonChange(event.target.value)} minLength={3} maxLength={500} required placeholder="For example: The screenshot is unclear. Please upload a clearer payment receipt." /><button className="admin-button admin-button-warning" type="submit" disabled={busy}>{busy ? "Sending…" : "Send request to applicant"}</button></form></td></tr>}
+        {application.payment?.paymentStatus === "Action Required" && <tr className="admin-expanded-row"><td colSpan={7}><div className="admin-applicant-action-note"><strong>Waiting for the applicant’s replacement screenshot</strong><span>The head delegate uploads it from the application status page. The new receipt will appear here for organiser review.</span></div></td></tr>}
+        {detail && <tr className="admin-expanded-row"><td colSpan={7}>
             <div className="admin-roster-heading"><strong>Delegate roster</strong><span>{detail.application.institution || "Institution not set"}</span></div>
             {detail.payment?.receiptFileId && (
                 <div className="admin-receipt-preview">
@@ -842,6 +902,61 @@ function ReceiptAnalysisPanel({ analysis }: { analysis: ReceiptAnalysis }) {
             {analysis.textExcerpt && <details><summary>OCR text excerpt</summary><p>{analysis.textExcerpt}</p></details>}
         </section>
     );
+}
+
+function AllocatedDelegatesTable({ delegates }: { delegates: AllocatedDelegate[] }) {
+    if (delegates.length === 0) {
+        return <div className="admin-empty"><span aria-hidden="true">◇</span><strong>No allocated delegates found</strong><p>Try another search or committee filter.</p></div>;
+    }
+    return <div className="admin-table-wrap">
+        <table className="admin-table admin-allocated-table">
+            <thead><tr><th>Delegate profile</th><th>Committee / role</th><th>Application</th><th>Brand ambassador</th><th>Preferences</th></tr></thead>
+            <tbody>{delegates.map((delegate) => <tr key={delegate.id}>
+                <td><strong>{delegate.fullName}</strong><span className="admin-cell-sub">{delegate.email}</span><span className="admin-cell-sub">{delegate.whatsappNumber || "No phone"} · {delegate.experienceLevel || "Experience not provided"}</span></td>
+                <td><strong>{delegate.assignedCommittee}</strong><span className="admin-cell-sub">{delegate.assignedPortfolio || "No country / portfolio"}</span><span className="admin-cell-sub">{delegate.isHead ? "Head delegate" : "Delegate"} · {delegate.delegateStatus || "Active"}</span></td>
+                <td><strong>{delegate.institution || (delegate.participantType === "solo" ? "Solo application" : "Delegation")}</strong><span className="admin-cell-sub">{delegate.applicationId}</span></td>
+                <td>{delegate.baCode || "Unattributed"}</td>
+                <td><span>{delegate.firstPreference || "—"}</span><span className="admin-cell-sub">Second: {delegate.secondPreference || "—"}</span></td>
+            </tr>)}</tbody>
+        </table>
+    </div>;
+}
+
+function BrandAmbassadorsView({ ambassadors, allocations }: { ambassadors: AmbassadorSummary[]; allocations: AmbassadorAllocation[] }) {
+    if (ambassadors.length === 0) {
+        return <section className="admin-panel"><div className="admin-empty"><span aria-hidden="true">◇</span><strong>No BA codes recorded yet</strong><p>Applications with a BA code will appear here with delegate and committee allocation totals.</p></div></section>;
+    }
+    const ranked = [...ambassadors].sort((left, right) => {
+        const delegateDifference = (right.soloDelegates + right.delegationDelegates) - (left.soloDelegates + left.delegationDelegates);
+        return delegateDifference || left.code.localeCompare(right.code);
+    });
+    const maxDelegates = Math.max(1, ...ranked.map((ambassador) => ambassador.soloDelegates + ambassador.delegationDelegates));
+    return <section className="admin-allocation-view">
+        <div className="admin-panel-heading"><div><p className="admin-eyebrow">Referral overview</p><h2>Brand ambassador leaderboard</h2></div><p className="admin-muted">Ranked by total delegates. Allocation shows placements across all committees.</p></div>
+        <section className="admin-panel admin-leaderboard" aria-label="Brand ambassador leaderboard">
+            <div className="admin-leaderboard-summary"><span>{ranked.length} ambassador{ranked.length === 1 ? "" : "s"}</span><span>Ranked by delegates referred</span></div>
+            <div className="admin-table-wrap">
+                <table className="admin-table admin-leaderboard-table">
+                    <thead><tr><th>Rank</th><th>BA code</th><th>Solo delegates</th><th>Delegates in delegations</th><th>Total delegates</th><th>Allocated</th><th>Committee breakdown</th></tr></thead>
+                    <tbody>{ranked.map((ambassador, index) => {
+                        const total = ambassador.soloDelegates + ambassador.delegationDelegates;
+                        const assigned = allocations.filter((allocation) => allocation.baCode === ambassador.code);
+                        const allocationRate = total ? Math.round((ambassador.allocatedDelegates / total) * 100) : 0;
+                        return <tr className={index < 3 ? `admin-leaderboard-row admin-leaderboard-row-${index + 1}` : "admin-leaderboard-row"} key={ambassador.code}>
+                            <td><span className="admin-rank-badge">{index < 3 ? ["1st", "2nd", "3rd"][index] : `#${index + 1}`}</span></td>
+                            <td><strong className="admin-leaderboard-code">{ambassador.code}</strong><span className="admin-cell-sub">{ambassador.soloApplications + ambassador.delegationApplications} applications</span></td>
+                            <td>{ambassador.soloDelegates}<span className="admin-cell-sub">{ambassador.soloApplications} applications</span></td>
+                            <td>{ambassador.delegationDelegates}<span className="admin-cell-sub">{ambassador.delegationApplications} applications</span></td>
+                            <td><div className="admin-leaderboard-total"><strong>{total}</strong><span className="admin-leaderboard-track"><span style={{ width: `${(total / maxDelegates) * 100}%` }} /></span></div></td>
+                            <td><strong>{ambassador.allocatedDelegates}</strong><span className="admin-cell-sub">{allocationRate}% placed</span></td>
+                            <td>{assigned.length ? <div className="admin-leaderboard-committees">{assigned.map((allocation) => <span key={`${ambassador.code}-${allocation.committee}`}>{allocation.committee}<b>{allocation.delegates}</b></span>)}</div> : <span className="admin-cell-sub">No placements yet</span>}</td>
+                        </tr>;
+                    })}</tbody>
+                </table>
+            </div>
+            <p className="admin-leaderboard-note">Applications without a BA code are not ranked. Delegate placement totals update when committee assignments change.</p>
+        </section>
+    </section>;
 }
 
 function CommitteeCard({

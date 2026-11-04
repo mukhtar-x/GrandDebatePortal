@@ -209,6 +209,10 @@ function ApplicationStatusView({
           <strong>{application.type === "solo" ? "Solo delegate" : "Delegation"}</strong>
         </span>
       </div>
+      {application.payment?.challanNumber ? <div className="application-meta">
+        <span><small>QuickPay challan</small><strong>{application.payment.challanNumber}{application.payment.test ? " · TEST — do not pay" : ""}</strong></span>
+        <span><small>Amount</small><strong>{`PKR ${application.payment.totalPayable.toLocaleString("en-PK")}`}</strong></span>
+      </div> : null}
 
       {isSpecial ? (
         <SpecialStatus email={email} application={application} onUpdate={onUpdate} />

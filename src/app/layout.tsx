@@ -22,7 +22,9 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  metadataBase: getPublicSiteUrl(),
+  metadataBase:
+    getPublicSiteUrl() ??
+    (process.env.NODE_ENV === "development" ? new URL("http://localhost:3000") : undefined),
   title: {
     default: "The Grand Debate ’26 - TLC",
     template: "%s - TGD'26",

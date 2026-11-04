@@ -15,11 +15,31 @@ export interface Pricing {
     totalPayable: number;
     rateType: "Early bird" | "Regular";
     pricePerDelegate: number;
+    delegationFee: number;
 }
 
 export type PricingResult =
     | { success: true; pricing: Pricing }
     | { success: false; error: string; code: "REGISTRATION_CLOSED" | "INVALID_PRICING_INPUT" };
+
+export function calculatePricingAtRate(
+    delegateCount: number,
+    rateType: Pricing["rateType"],
+): PricingResult {
+    const validCount = Number.isInteger(delegateCount) && (delegateCount === 1 || (delegateCount >= MIN_DELEGATION_SIZE && delegateCount <= MAX_DELEGATION_SIZE));
+    if (!validCount) return { success: false, code: "INVALID_PRICING_INPUT", error: "Delegate count is invalid." };
+    const pricePerDelegate = rateType === "Early bird" ? EARLY_BIRD_PRICE : REGULAR_PRICE;
+    const delegationFee = delegateCount > 1 ? 500 : 0;
+    return {
+        success: true,
+        pricing: {
+            totalPayable: pricePerDelegate * delegateCount + delegationFee,
+            rateType,
+            pricePerDelegate,
+            delegationFee,
+        },
+    };
+}
 
 export function calculatePricing(delegateCount: number, date = new Date()): PricingResult {
     const validCount =
@@ -47,9 +67,10 @@ export function calculatePricing(delegateCount: number, date = new Date()): Pric
     return {
         success: true,
         pricing: {
-            totalPayable: pricePerDelegate * delegateCount,
+            totalPayable: pricePerDelegate * delegateCount + (delegateCount > 1 ? 500 : 0),
             rateType: isEarlyBird ? "Early bird" : "Regular",
             pricePerDelegate,
+            delegationFee: delegateCount > 1 ? 500 : 0,
         },
     };
 }

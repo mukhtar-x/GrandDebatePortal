@@ -43,6 +43,7 @@ export async function GET(request: Request): Promise<Response> {
                 { contactEmail: pattern },
                 { contactName: pattern },
                 { institution: pattern },
+                { baCode: pattern },
                 ...(delegateApplications.length ? [{ applicationId: { $in: delegateApplications } }] : []),
             ];
         }
@@ -61,6 +62,9 @@ export async function GET(request: Request): Promise<Response> {
                                 _id: 0,
                                 paymentStatus: 1,
                                 totalPayable: 1,
+                                delegationFee: 1,
+                                challanNumber: 1,
+                                challanEnvironment: 1,
                                 rateType: 1,
                                 transactionId: 1,
                                 receiptFileId: 1,

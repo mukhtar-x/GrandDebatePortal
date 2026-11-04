@@ -27,13 +27,12 @@ export const DEFAULT_COMMITTEE_OPTIONS: CommitteeOption[] = [
         active: true,
     },
     {
-        code: "SOCHUM",
-        name: "Social, Humanitarian and Cultural Committee",
+        code: "PAC",
+        name: "Pakistan Aurat Council",
         agenda: "To be announced",
         suitedTo: "All delegates",
         level: "All levels",
         totalSeats: 0,
-        studyGuideUrl: "/docs/committees/sochum-study-guide.pdf",
         active: true,
     },
     {

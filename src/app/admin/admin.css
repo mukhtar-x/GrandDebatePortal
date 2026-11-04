@@ -203,6 +203,33 @@
 .admin-allocate-row > div span { margin-top: 3px; color: #7a8492; font-size: 10px; overflow-wrap: anywhere; }
 .admin-disclaimer { margin: 18px 0 0; color: #7b8490; font-size: 11px; line-height: 1.6; }
 .admin-disclaimer strong { color: #665027; }
+.admin-panel-heading { align-items: flex-start; }
+.admin-filters { min-width: 0; flex: 1; justify-content: flex-end; flex-wrap: wrap; }
+.admin-search { flex: 1 1 270px; }
+.admin-filters select { max-width: 190px; }
+.admin-row-actions { min-width: 250px; }
+.admin-allocation-filters { display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid #ece9e2; }
+.admin-allocation-filters select { min-width: 180px; height: 40px; padding: 0 11px; border: 1px solid #dedbd3; border-radius: 7px; background: #fff; color: #25334a; font-size: 12px; }
+.admin-allocated-table { min-width: 850px; }
+.admin-leaderboard-summary { display: flex; justify-content: space-between; gap: 12px; padding: 13px 20px; border-bottom: 1px solid #ece9e2; color: #707b8c; font-size: 11px; }
+.admin-leaderboard-table { min-width: 980px; }
+.admin-leaderboard-table th,.admin-leaderboard-table td { padding-top: 15px; padding-bottom: 15px; }
+.admin-leaderboard-row-1 { background: #fffdf7; }
+.admin-leaderboard-row-2 { background: #fcfcfb; }
+.admin-leaderboard-row-3 { background: #fdfaf7; }
+.admin-rank-badge { display: inline-grid; min-width: 42px; height: 30px; place-items: center; padding: 0 8px; border: 1px solid #e5e1d8; border-radius: 999px; background: #faf9f6; color: #526075; font-size: 11px; font-weight: 700; }
+.admin-leaderboard-row-1 .admin-rank-badge { border-color: #e6cf96; background: #fff4d6; color: #795718; }
+.admin-leaderboard-row-2 .admin-rank-badge { border-color: #d8dde3; background: #f0f2f5; color: #4d596b; }
+.admin-leaderboard-row-3 .admin-rank-badge { border-color: #e4c6ae; background: #f8eee6; color: #805333; }
+.admin-leaderboard-code { color: #192e50; letter-spacing: .02em; }
+.admin-leaderboard-total { display: flex; min-width: 110px; align-items: center; gap: 10px; }
+.admin-leaderboard-total > strong { min-width: 22px; color: #172e55; font-family: Georgia, serif; font-size: 20px; }
+.admin-leaderboard-track { overflow: hidden; width: 72px; height: 6px; border-radius: 99px; background: #eeece7; }
+.admin-leaderboard-track > span { display: block; height: 100%; border-radius: inherit; background: #b48b45; }
+.admin-leaderboard-committees { display: flex; max-width: 310px; flex-wrap: wrap; gap: 5px; }
+.admin-leaderboard-committees > span { display: inline-flex; align-items: center; gap: 6px; padding: 4px 7px; border: 1px solid #e8e4dc; border-radius: 999px; background: #faf9f6; color: #536075; font-size: 10px; white-space: nowrap; }
+.admin-leaderboard-committees b { color: #182d50; }
+.admin-leaderboard-note { margin: 0; padding: 12px 20px 16px; color: #7b8490; font-size: 10px; line-height: 1.5; }
 .admin-alert,.admin-toast { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 15px; border-radius: 8px; font-size: 12px; }
 .admin-alert { border: 1px solid #efc4bd; background: #fff2f0; color: #873c32; }
 .admin-alert-global,.admin-toast { width: min(100% - 48px, 1440px); margin: 14px auto 0; }
@@ -238,9 +265,14 @@
   .admin-metric > strong { font-size: 23px; }
   .admin-panel-heading { align-items: flex-start; flex-direction: column; }
   .admin-filters { width: 100%; align-items: stretch; flex-direction: column; }
+  .admin-filters { justify-content: flex-start; }
   .admin-filters > .admin-button { width: 100%; }
   .admin-search { min-width: 0; }
   .admin-filters select { width: 100%; }
+  .admin-allocation-filters { align-items: stretch; flex-direction: column; }
+  .admin-allocation-filters select { width: 100%; }
+  .admin-leaderboard-summary { padding: 12px 14px; }
+  .admin-leaderboard-note { padding-right: 14px; padding-left: 14px; }
   .admin-pagination { align-items: flex-start; flex-direction: column; }
   .admin-pagination > div { width: 100%; justify-content: space-between; }
   .admin-committee-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

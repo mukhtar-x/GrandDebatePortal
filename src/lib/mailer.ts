@@ -24,6 +24,9 @@ export type MailEvent =
           rateType: string;
           participantType: "solo" | "delegation";
           delegateCount: number;
+          challanNumber: string;
+          delegationFee: number;
+          challanEnvironment: "test" | "live";
       }
     | { type: "receiptResubmitted" }
     | { type: "paymentConfirmed" }
@@ -238,7 +241,7 @@ function describe(event: MailEvent, applicationId: string): EmailContent {
     switch (event.type) {
         case "registrationReceived": {
             const solo = event.participantType === "solo";
-            const perDelegate = Math.round(event.totalPayable / Math.max(event.delegateCount, 1));
+            const perDelegate = Math.round((event.totalPayable - event.delegationFee) / Math.max(event.delegateCount, 1));
             return {
                 subject: `Registration received: ${applicationId}`,
                 eyebrow: "Registration received",
@@ -253,6 +256,8 @@ function describe(event: MailEvent, applicationId: string): EmailContent {
                             { label: "Delegates", value: String(event.delegateCount) },
                             { label: "Rate applied", value: event.rateType },
                             { label: "Fee per delegate", value: `PKR ${perDelegate.toLocaleString("en-US")}` },
+                            ...(event.delegationFee ? [{ label: "Delegation fee", value: `PKR ${event.delegationFee.toLocaleString("en-US")}` }] : []),
+                            { label: "QuickPay challan", value: event.challanNumber + (event.challanEnvironment === "test" ? " (TEST — do not pay)" : "") },
                             { label: "Total payable", value: `PKR ${event.totalPayable.toLocaleString("en-US")}` },
                             { label: "Status", value: "Payment under review" },
                         ],
@@ -496,10 +501,13 @@ export async function sendRegistrationSmokeTest(
     const applicationId = `TGD-TEST-${participantType.toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`;
     const event: MailEvent = {
         type: "registrationReceived",
-        totalPayable: delegateCount * 2000,
+        totalPayable: delegateCount * 2000 + (delegateCount > 1 ? 500 : 0),
         rateType: "Early bird",
         participantType,
         delegateCount,
+        challanNumber: "TEST-42001",
+        delegationFee: participantType === "solo" ? 0 : 500,
+        challanEnvironment: "test",
     };
     const name = participantType === "solo" ? "Sample Solo Delegate" : "Sample Delegation Lead";
     return send(event, applicationId, to, name);

@@ -20,7 +20,7 @@ const earlyBirdTarget: CountdownTarget = {
 
 const registrationTarget: CountdownTarget = {
   title: "Registration closes in",
-  description: "Regular registration · until 15 November, 11:59 PM",
+  description: "Regular registration · until 18 November, 11:59 PM",
   deadline: new Date(REGISTRATION_ENDS_AT).getTime(),
 };
 

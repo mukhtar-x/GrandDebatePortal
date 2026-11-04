@@ -18,7 +18,9 @@ export interface RegistrationInput {
   delegation: DelegationFormValues;
   receipt: File;
   transactionId: string;
+  baCode: string;
   idempotencyKey: string;
+  reservationToken: string;
 }
 
 export interface RegistrationSuccess {
@@ -26,6 +28,18 @@ export interface RegistrationSuccess {
   firstName: string;
   totalPayable: number;
   rateType: string;
+  challanNumber: string;
+  test?: boolean;
+}
+
+export interface ChallanReservation {
+  reservationToken: string;
+  challanNumber: string;
+  amount: number;
+  rateType: string;
+  expiresAt: string;
+  graceUntil: string;
+  test: boolean;
 }
 
 export type RegistrationResult =
@@ -36,32 +50,25 @@ function toApiExperience(value: string) {
   return EXPERIENCE_TO_API[value] ?? value;
 }
 
-function buildPayload(input: RegistrationInput) {
-  const common = {
-    transactionId: input.transactionId.trim() || undefined,
-    idempotencyKey: input.idempotencyKey,
-  };
-
+export function buildRegistrationDetails(input: Pick<RegistrationInput, "type" | "solo" | "delegation" | "baCode">) {
+  const common = { baCode: input.baCode.trim() || undefined };
   if (input.type === "solo") {
     const { solo } = input;
     return {
       ...common,
       participantType: "solo",
       institution: solo.institution,
-      delegates: [
-        {
-          fullName: solo.fullName,
-          email: solo.email,
-          whatsappNumber: solo.whatsapp,
-          experienceLevel: toApiExperience(solo.experience),
-          additionalInfo: solo.additionalInformation || undefined,
-          firstPreference: solo.firstPreference,
-          secondPreference: solo.secondPreference,
-        },
-      ],
+      delegates: [{
+        fullName: solo.fullName,
+        email: solo.email,
+        whatsappNumber: solo.whatsapp,
+        experienceLevel: toApiExperience(solo.experience),
+        additionalInfo: solo.additionalInformation || undefined,
+        firstPreference: solo.firstPreference,
+        secondPreference: solo.secondPreference,
+      }],
     };
   }
-
   const { delegation } = input;
   return {
     ...common,
@@ -82,6 +89,21 @@ function buildPayload(input: RegistrationInput) {
   };
 }
 
+function buildPayload(input: RegistrationInput) {
+  const details = buildRegistrationDetails(input);
+  const common = {
+    transactionId: input.transactionId.trim() || undefined,
+    baCode: input.baCode.trim() || undefined,
+    idempotencyKey: input.idempotencyKey,
+  };
+
+  return {
+    ...details,
+    ...common,
+    reservationToken: input.reservationToken,
+  };
+}
+
 const FIELD_LABELS: Record<string, string> = {
   fullName: "Full name",
   email: "Email",
@@ -96,6 +118,8 @@ const FIELD_LABELS: Record<string, string> = {
   headWhatsapp: "Head delegate WhatsApp number",
   receipt: "Payment screenshot",
   transactionId: "Transaction ID",
+  baCode: "BA Code",
+  reservationToken: "Challan",
   delegates: "Delegates",
 };
 
@@ -107,6 +131,33 @@ export function describeField(field: string, type: RegistrationType) {
     return type === "solo" ? label : "Delegate " + (Number(match[1]) + 1) + " · " + label;
   }
   return FIELD_LABELS[field] ?? field;
+}
+
+export async function reserveChallan(registration: ReturnType<typeof buildRegistrationDetails>) {
+  try {
+    const response = await fetch("/api/challans/reserve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ registration }),
+    });
+    const body = await response.json().catch(() => null);
+    if (!response.ok || !body?.success) return { ok: false as const, error: body?.error ?? "A challan could not be reserved." };
+    return { ok: true as const, data: body as ChallanReservation };
+  } catch {
+    return { ok: false as const, error: "We could not reach the server. Please try again." };
+  }
+}
+
+export async function releaseChallan(reservationToken: string) {
+  try {
+    await fetch("/api/challans/reserve", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reservationToken }),
+    });
+  } catch {
+    // Any lost release request is recovered when the reservation grace period elapses.
+  }
 }
 
 export async function submitRegistration(input: RegistrationInput): Promise<RegistrationResult> {
@@ -125,6 +176,8 @@ export async function submitRegistration(input: RegistrationInput): Promise<Regi
           firstName: body.firstName,
           totalPayable: body.totalPayable,
           rateType: body.rateType,
+          challanNumber: body.challanNumber,
+          test: body.test === true,
         },
       };
     }

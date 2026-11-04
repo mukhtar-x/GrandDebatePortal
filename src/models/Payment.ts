@@ -39,6 +39,9 @@ export interface IReceiptAnalysis {
 export interface IPayment {
     applicationId: string;
     totalPayable: number;
+    delegationFee?: number;
+    challanNumber?: string;
+    challanEnvironment?: "test" | "live";
     rateType: "Early bird" | "Regular";
     receiptUrl: string;
     transactionId?: string;
@@ -61,6 +64,9 @@ const paymentSchema = new Schema<IPayment>(
     {
         applicationId: { type: String, required: true, trim: true },
         totalPayable: { type: Number, required: true, min: 0 },
+        delegationFee: { type: Number, default: 0, min: 0 },
+        challanNumber: { type: String, trim: true, unique: true, sparse: true },
+        challanEnvironment: { type: String, enum: ["test", "live"], default: "live", required: true },
         rateType: { type: String, enum: ["Early bird", "Regular"], required: true },
         receiptUrl: { type: String, required: true, trim: true },
         transactionId: { type: String, trim: true },

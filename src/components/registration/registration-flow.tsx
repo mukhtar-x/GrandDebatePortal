@@ -27,7 +27,11 @@ import {
 } from "@/data/event";
 import {
   describeField,
+  buildRegistrationDetails,
+  reserveChallan,
+  releaseChallan,
   submitRegistration,
+  type ChallanReservation,
   type RegistrationSuccess,
 } from "@/lib/api/registration";
 
@@ -69,6 +73,7 @@ function FeeSummary({
         <span>{registrationWindow.name} rate</span>
         <strong>{formatPKR(registrationWindow.feePerDelegate)} each</strong>
       </div>
+      {delegateCount > 1 ? <div className="summary-line"><span>Delegation fee</span><strong>{formatPKR(500)}</strong></div> : null}
       <div className="summary-total">
         <span>Total payable</span>
         <strong aria-live="polite" aria-atomic="true">{formatPKR(total)}</strong>
@@ -81,6 +86,7 @@ function FeeSummary({
 }
 
 export function RegistrationFlow() {
+  const [step, setStep] = useState(1);
   const [registrationType, setRegistrationType] = useState<RegistrationType>("solo");
   const [registrationWindow, setRegistrationWindow] =
     useState<RegistrationWindow>(CURRENT_REGISTRATION_WINDOW);
@@ -90,11 +96,25 @@ export function RegistrationFlow() {
   const [confirmation, setConfirmation] = useState<RegistrationSuccess | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [flowError, setFlowError] = useState<string | null>(null);
+  const [baCode, setBaCode] = useState("");
+  const [reservation, setReservation] = useState<ChallanReservation | null>(null);
+  const [reserving, setReserving] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const detailsSectionRef = useRef<HTMLElement>(null);
   // One key per form fill (created on first submit), so a retry cannot create two registrations.
   const idempotencyKey = useRef<string | null>(null);
 
   const delegateCount = registrationType === "solo" ? 1 : delegation.size;
-  const total = delegateCount * registrationWindow.feePerDelegate;
+  const total = delegateCount * registrationWindow.feePerDelegate + (delegateCount > 1 ? 500 : 0);
+
+  function invalidateReservation() {
+    if (!reservation) return;
+    void releaseChallan(reservation.reservationToken);
+    setReservation(null);
+    setReceipt(null);
+    setFlowError("Your details changed, so the previous challan was invalidated. Generate a new one after reviewing your details.");
+  }
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -103,7 +123,13 @@ export function RegistrationFlow() {
     return () => window.clearTimeout(timeout);
   }, []);
 
+  useEffect(() => {
+    const interval = window.setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+
   function handleSoloChange(field: keyof SoloFormValues, value: string) {
+    invalidateReservation();
     setSolo((current) => ({ ...current, [field]: value }));
   }
 
@@ -111,6 +137,7 @@ export function RegistrationFlow() {
     field: "institution" | "headName" | "headEmail" | "headWhatsapp",
     value: string,
   ) {
+    invalidateReservation();
     setDelegation((current) => {
       const next = { ...current, [field]: value };
       if (current.headIsDelegate && field !== "institution") {
@@ -129,6 +156,7 @@ export function RegistrationFlow() {
   }
 
   function handleDelegationSizeChange(size: number) {
+    invalidateReservation();
     setDelegation((current) => {
       const safeSize = Math.max(
         MIN_DELEGATION_SIZE,
@@ -144,6 +172,7 @@ export function RegistrationFlow() {
   }
 
   function handleHeadIsDelegateChange(checked: boolean) {
+    invalidateReservation();
     setDelegation((current) => {
       const delegates = [...current.delegates];
       delegates[0] = {
@@ -161,6 +190,7 @@ export function RegistrationFlow() {
     field: keyof DelegateFormValues,
     value: string,
   ) {
+    invalidateReservation();
     setDelegation((current) => {
       const delegates = [...current.delegates];
       delegates[index] = { ...delegates[index], [field]: value };
@@ -169,6 +199,7 @@ export function RegistrationFlow() {
   }
 
   function handleRemoveDelegate(index: number) {
+    invalidateReservation();
     setDelegation((current) => {
       if (
         current.delegates.length <= MIN_DELEGATION_SIZE ||
@@ -190,6 +221,7 @@ export function RegistrationFlow() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (step !== 4 || !reservation) return;
     if (submitting || !event.currentTarget.reportValidity()) return;
     if (!receipt) {
       setSubmitError("Please upload a screenshot of your payment before submitting.");
@@ -206,7 +238,9 @@ export function RegistrationFlow() {
       delegation,
       receipt,
       transactionId: typeof transactionId === "string" ? transactionId : "",
+      baCode,
       idempotencyKey: idempotencyKey.current,
+      reservationToken: reservation.reservationToken,
     });
     setSubmitting(false);
 
@@ -223,11 +257,34 @@ export function RegistrationFlow() {
   }
 
   function startNewRegistration() {
+    invalidateReservation();
+    setStep(1);
     setConfirmation(null);
     setSolo(emptySoloForm());
     setDelegation(emptyDelegation());
     setReceipt(null);
+    setBaCode("");
     idempotencyKey.current = null;
+  }
+
+  function continueToDetails() { setStep(2); setFlowError(null); }
+
+  function continueToReview() {
+    const fields = detailsSectionRef.current?.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input,select,textarea") ?? [];
+    let valid = true;
+    fields.forEach((field) => { if (!field.checkValidity()) { field.reportValidity(); valid = false; } });
+    if (valid) { setStep(3); setFlowError(null); }
+  }
+
+  async function generateChallan() {
+    if (reserving) return;
+    setReserving(true);
+    setFlowError(null);
+    const result = await reserveChallan(buildRegistrationDetails({ type: registrationType, solo, delegation, baCode }));
+    setReserving(false);
+    if (!result.ok) { setFlowError(result.error); return; }
+    setReservation(result.data);
+    setStep(4);
   }
 
   if (confirmation) {
@@ -239,7 +296,7 @@ export function RegistrationFlow() {
         <p className="section-overline">Registration received</p>
         <h2>Thank you, {confirmation.firstName}.</h2>
         <p className="confirmation-copy">
-          Your registration has been received. Your payment will now be reviewed. Once it
+          Your registration has been received with challan {confirmation.challanNumber}{confirmation.test ? " (TEST — not payable)" : ""}. Your payment will now be reviewed. Once it
           is confirmed, your committee will be allocated within 1 to 3 business days. You
           may monitor your progress in the portal at any time.
         </p>
@@ -286,7 +343,12 @@ export function RegistrationFlow() {
   return (
     <div className="registration-layout">
       <form className="registration-form" onSubmit={handleSubmit}>
-        <section className="form-card">
+        <nav className="registration-steps" aria-label="Registration progress">
+          {["Type", "Details", "Review & challan", "Payment"].map((label, index) => (
+            <span key={label} className={step === index + 1 ? "is-current" : step > index + 1 ? "is-complete" : ""}>{index + 1}. {label}</span>
+          ))}
+        </nav>
+        {step === 1 ? <section className="form-card">
           <div className="form-card-heading">
             <div className="section-heading-icon">01</div>
             <div>
@@ -340,9 +402,10 @@ export function RegistrationFlow() {
               </span>
             </button>
           </div>
-        </section>
+          <button className="button button-primary" type="button" onClick={continueToDetails}>Continue to details <ActionIcon /></button>
+        </section> : null}
 
-        <section className="form-card">
+        {step === 2 ? <section className="form-card" ref={detailsSectionRef}>
           <div className="form-card-heading">
             <div className="section-heading-icon">02</div>
             <div>
@@ -367,12 +430,36 @@ export function RegistrationFlow() {
               id="registration-ba-code"
               name="baCode"
               label="BA Code"
+              value={baCode}
+              onChange={(event) => { invalidateReservation(); setBaCode(event.currentTarget.value); }}
               placeholder="Enter your BA Code, if you have one"
               autoComplete="off"
-              hint="Optional. The registration service does not currently accept or store this code."
+              hint="Optional. Enter the code provided by your Brand Ambassador."
             />
           </div>
-        </section>
+          {flowError ? <div className="lookup-error" role="alert"><p>{flowError}</p></div> : null}
+          <div className="form-navigation">
+            <button className="button button-quiet" type="button" onClick={() => setStep(1)}>Back</button>
+            <button className="button button-primary" type="button" onClick={continueToReview}>Review details <ActionIcon /></button>
+          </div>
+        </section> : null}
+
+        {step === 3 ? <section className="form-card">
+          <div className="form-card-heading"><div className="section-heading-icon">03</div><div><p className="section-overline">Review before payment</p><h2>Confirm your fee and details</h2></div></div>
+          <FeeSummary registrationType={registrationType} delegateCount={delegateCount} registrationWindow={registrationWindow} total={total} />
+          <div className="review-details">
+            <h3>Registration details</h3>
+            <p><strong>Institution:</strong> {registrationType === "solo" ? solo.institution : delegation.institution}</p>
+            {registrationType === "delegation" ? <p><strong>Contact:</strong> {delegation.headName} · {delegation.headEmail}</p> : null}
+            <ol>{(registrationType === "solo" ? [solo] : delegation.delegates).map((delegate, index) => <li key={`${delegate.email}-${index}`}><strong>{delegate.fullName}</strong><span>{delegate.email}</span></li>)}</ol>
+          </div>
+          <p className="payment-rate">Delegation fee: {formatPKR(delegateCount > 1 ? 500 : 0)}. The payable amount and rate are set by the server when your challan is reserved.</p>
+          {flowError ? <div className="lookup-error" role="alert"><p>{flowError}</p></div> : null}
+          <div className="form-navigation">
+            <button className="button button-quiet" type="button" onClick={() => setStep(2)}>Edit details</button>
+            <button className="button button-primary" type="button" onClick={generateChallan} disabled={reserving} aria-busy={reserving}>{reserving ? "Reserving…" : "Generate challan"} <ActionIcon /></button>
+          </div>
+        </section> : null}
 
         <div className="registration-mobile-summary">
           <FeeSummary
@@ -383,15 +470,18 @@ export function RegistrationFlow() {
           />
         </div>
 
-        <PaymentSection
+        {step === 4 ? <PaymentSection
           delegateCount={delegateCount}
           feePerDelegate={registrationWindow.feePerDelegate}
           rateLabel={registrationWindow.name}
           receiptName={receipt?.name ?? ""}
           onReceiptChange={setReceipt}
-        />
+          reservation={reservation}
+          onRegenerate={generateChallan}
+          onEditDetails={() => { invalidateReservation(); setStep(2); setSubmitError(null); }}
+        /> : null}
 
-        <section className="submit-card">
+        {step === 4 ? <section className="submit-card">
           <label className="checkbox-row terms-row">
             <input type="checkbox" required />
             <span>
@@ -408,13 +498,13 @@ export function RegistrationFlow() {
               <p>{submitError}</p>
             </div>
           ) : null}
-          <button
+            <button
             className="button button-primary submit-button"
             type="submit"
-            disabled={submitting}
+            disabled={submitting || !reservation || (currentTime > 0 && currentTime >= new Date(reservation.graceUntil).getTime())}
             aria-busy={submitting}
           >
-            {submitting ? "Submitting…" : "Submit Registration"}{" "}
+            {submitting ? "Submitting…" : currentTime >= new Date(reservation?.graceUntil ?? 0).getTime() ? "Challan expired" : "Submit Registration"}{" "}
             <ActionIcon />
           </button>
           <p className="submit-footnote">
@@ -422,7 +512,7 @@ export function RegistrationFlow() {
             All payments are final and non-refundable. Your payment will be reviewed, and
             your status will be updated in the portal.
           </p>
-        </section>
+        </section> : null}
       </form>
 
       <aside className="registration-sidebar">

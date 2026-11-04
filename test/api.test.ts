@@ -32,11 +32,11 @@ function assertPricing(date: string, delegateCount: number, fee: number, rateTyp
 }
 
 async function main(): Promise<void> {
-await test("pricing: early-bird deadline (7 November, PKT)", () => {
-    assertPricing("2026-11-07T23:59:59.999+05:00", 1, 2000, "Early bird");
+await test("pricing: early-bird deadline (12 November, PKT)", () => {
+    assertPricing("2026-11-12T23:59:59.999+05:00", 1, 2000, "Early bird");
 });
-await test("pricing: regular starts 8 November and ends 15 November (PKT)", () => {
-    assertPricing("2026-11-08T00:00:00.000+05:00", 1, 2400, "Regular");
+await test("pricing: regular starts 13 November and ends 15 November (PKT)", () => {
+    assertPricing("2026-11-13T00:00:00.000+05:00", 1, 2400, "Regular");
     assertPricing("2026-11-15T23:59:59.999+05:00", 4, 9600, "Regular");
 });
 await test("pricing: registration closes 16 November (PKT)", () => {
@@ -87,10 +87,10 @@ await test("study guides: placeholder PDFs exist and are valid PDF-1.4 files", (
     }
 });
 await test("committeeDefaults: references correct relative public URLs", () => {
-    const expectedUrls: Record<string, string> = {
+    const expectedUrls: Record<string, string | undefined> = {
         UNSC: "/docs/committees/unsc-study-guide.pdf",
         DISEC: "/docs/committees/disec-study-guide.pdf",
-        SOCHUM: "/docs/committees/sochum-study-guide.pdf",
+        PAC: undefined,
         "UN Women": "/docs/committees/unwomen-study-guide.pdf",
         PNA: "/docs/committees/pna-study-guide.pdf",
     };
@@ -101,6 +101,8 @@ await test("committeeDefaults: references correct relative public URLs", () => {
             `Mismatch for committee ${committee.code}`,
         );
     }
+    assert.equal(Application.schema.path("baCode")?.options.type, String);
+    assert.equal(Application.schema.path("baCode")?.options.maxlength, 50);
 });
 await test("schema indexes: compound and unique indexes are defined on models", () => {
     const delegateIndexes = Delegate.schema.indexes() as Array<[Record<string, unknown>, Record<string, unknown>]>;
@@ -150,13 +152,15 @@ if (serverAvailable) {
         assert.ok(Array.isArray(committees));
         assert.deepEqual(
             new Set(committees.map((committee: { code: string }) => committee.code)),
-            new Set(["UNSC", "DISEC", "SOCHUM", "UN Women", "PNA"]),
+            new Set(["UNSC", "DISEC", "PAC", "UN Women", "PNA"]),
         );
     });
 
     await test("Admin APIs reject unauthenticated dashboard and export requests", async () => {
         const requests: Array<{ url: string; init?: RequestInit }> = [
             { url: `${baseUrl}/api/admin/overview` },
+            { url: `${baseUrl}/api/admin/brand-ambassadors` },
+            { url: `${baseUrl}/api/admin/committees` },
             { url: `${baseUrl}/api/admin/export` },
             { url: `${baseUrl}/api/admin/receipts/check-pending`, init: { method: "POST" } },
         ];
@@ -291,6 +295,24 @@ if (serverAvailable) {
             assert.match(JSON.stringify(body), new RegExp(expectedMessage, "i"));
         });
     }
+
+    await test("POST /api/register rejects an overlong BA Code", async () => {
+        const form = new FormData();
+        form.set(
+            "payload",
+            JSON.stringify({
+                participantType: "solo",
+                institution: "Integration Test University",
+                baCode: "A".repeat(51),
+                delegates: [{}],
+            }),
+        );
+        const response = await fetch(`${baseUrl}/api/register`, { method: "POST", body: form });
+        assert.equal(response.status, 400);
+        const body: unknown = await response.json();
+        assert.match(JSON.stringify(body), /BA Code is invalid or too long/i);
+        assert.match(JSON.stringify(body), /"field":"baCode"/);
+    });
 
     await test("POST /api/status/receipt rejects missing credentials", async () => {
         const form = new FormData();

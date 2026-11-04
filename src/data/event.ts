@@ -13,7 +13,7 @@ export const MAX_DELEGATION_SIZE = 7;
 
 // Registration cutoffs use Pakistan time and are shared by pricing and the UI.
 export const EARLY_BIRD_ENDS_AT = "2026-11-13T00:00:00+05:00";
-export const REGISTRATION_ENDS_AT = "2026-11-16T00:00:00+05:00";
+export const REGISTRATION_ENDS_AT = "2026-11-19T00:00:00+05:00";
 
 export const COMMITTEES = [
   { code: "UNSC", name: "United Nations Security Council" },
@@ -46,16 +46,16 @@ const REGULAR_WINDOW = {
   key: "regular",
   name: "Regular",
   feePerDelegate: 2400,
-  deadline: "15 November 2026",
+  deadline: "18 November 2026",
   description:
-    "Early bird registration has closed. Regular registration remains open until 15 November. Delegate fee: PKR 2,400.",
+    "Early bird registration has closed. Regular registration remains open through 18 November. Delegate fee: PKR 2,400.",
 } as const;
 
 const CLOSED_WINDOW = {
   key: "closed",
   name: "Registration closed",
   feePerDelegate: 0,
-  deadline: "15 November 2026",
+  deadline: "18 November 2026",
   description:
     "Registration is now closed. Registered delegates may track their application through the portal.",
 } as const;

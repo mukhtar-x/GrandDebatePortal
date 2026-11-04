@@ -1,10 +1,12 @@
 import { after } from "next/server";
+import { createHash } from "node:crypto";
 import { MAX_DELEGATION_SIZE, MIN_DELEGATION_SIZE } from "@/data/event";
 import { getCommitteeOptions } from "@/lib/committeeOptions";
 import connectDB from "@/lib/db";
 import { generateApplicationId } from "@/lib/idGenerator";
 import { notifyContact } from "@/lib/mailer";
-import { calculatePricing, type Pricing } from "@/lib/pricing";
+import { calculatePricingAtRate, type Pricing } from "@/lib/pricing";
+import { CHALLAN_ENVIRONMENT, registrationFingerprint } from "@/lib/challans";
 import { consumeRateLimit, rateLimitedResponse } from "@/lib/rateLimit";
 import { quickCheckReceiptSafely } from "@/lib/receipts/analyze";
 import { deleteReceipt, putReceipt, receiptUrlFor } from "@/lib/receipts/store";
@@ -24,6 +26,7 @@ import {
 import Application from "@/models/Application";
 import Delegate, { EXPERIENCE_LEVELS, type IDelegate } from "@/models/Delegate";
 import Payment from "@/models/Payment";
+import Challan from "@/models/Challan";
 
 export const maxDuration = 60;
 
@@ -54,7 +57,9 @@ interface RegistrationBody {
     contact: RegistrationContact;
     headIsDelegate: boolean;
     transactionId?: string;
+    baCode?: string;
     idempotencyKey?: string;
+    reservationToken: string;
 }
 
 type ParseResult =
@@ -77,7 +82,9 @@ function parseRegistration(body: unknown, activeCodes: Set<string>): ParseResult
 
     const participantType = normalizeString(body.participantType);
     const transactionId = normalizeString(body.transactionId);
+    const baCode = normalizeString(body.baCode);
     const idempotencyKey = normalizeString(body.idempotencyKey);
+    const reservationToken = normalizeString(body.reservationToken);
     const delegates = body.delegates;
 
     if (participantType !== "solo" && participantType !== "delegation") {
@@ -85,6 +92,9 @@ function parseRegistration(body: unknown, activeCodes: Set<string>): ParseResult
     }
     if (!Array.isArray(delegates)) {
         return { success: false, error: "delegates must be an array.", field: "delegates" };
+    }
+    if (typeof reservationToken !== "string" || !/^[A-Za-z0-9_-]{40,60}$/.test(reservationToken)) {
+        return { success: false, error: "Generate a challan for these details before submitting payment.", field: "reservationToken" };
     }
     if (participantType === "solo" && delegates.length !== 1) {
         return { success: false, error: "Solo registration must contain exactly one delegate.", field: "delegates" };
@@ -110,6 +120,9 @@ function parseRegistration(body: unknown, activeCodes: Set<string>): ParseResult
         (typeof transactionId !== "string" || transactionId.length > MAX_LENGTHS.transactionId)
     ) {
         return { success: false, error: "Transaction ID is invalid.", field: "transactionId" };
+    }
+    if (baCode !== undefined && baCode !== "" && (typeof baCode !== "string" || baCode.length > MAX_LENGTHS.baCode)) {
+        return { success: false, error: "BA Code is invalid or too long.", field: "baCode" };
     }
     if (
         idempotencyKey !== undefined &&
@@ -234,7 +247,9 @@ function parseRegistration(body: unknown, activeCodes: Set<string>): ParseResult
             delegates: normalizedDelegates,
             contact,
             headIsDelegate,
+            reservationToken,
             ...(typeof transactionId === "string" && transactionId ? { transactionId } : {}),
+            ...(typeof baCode === "string" && baCode ? { baCode } : {}),
             ...(typeof idempotencyKey === "string" ? { idempotencyKey } : {}),
         },
     };
@@ -245,6 +260,8 @@ function successResponse(
     contactName: string,
     pricing: Pick<Pricing, "totalPayable" | "rateType">,
     status = 201,
+    challanNumber?: string,
+    challanEnvironment: "test" | "live" = CHALLAN_ENVIRONMENT,
 ): Response {
     return Response.json(
         {
@@ -253,6 +270,8 @@ function successResponse(
             firstName: firstName(contactName),
             totalPayable: pricing.totalPayable,
             rateType: pricing.rateType,
+            ...(challanNumber ? { challanNumber } : {}),
+            test: challanEnvironment === "test",
         },
         { status },
     );
@@ -315,14 +334,16 @@ export async function POST(request: Request): Promise<Response> {
                 .lean<{ applicationId: string; contactName?: string }>();
             if (existing) {
                 const payment = await Payment.findOne({ applicationId: existing.applicationId })
-                    .select("totalPayable rateType")
-                    .lean<{ totalPayable: number; rateType: Pricing["rateType"] }>();
+                    .select("totalPayable rateType challanNumber challanEnvironment")
+                    .lean<{ totalPayable: number; rateType: Pricing["rateType"]; challanNumber?: string; challanEnvironment?: "test" | "live" }>();
                 if (payment) {
                     return successResponse(
                         existing.applicationId,
                         existing.contactName ?? registration.contact.name,
                         payment,
                         200,
+                        payment.challanNumber,
+                        payment.challanEnvironment,
                     );
                 }
             }
@@ -349,13 +370,24 @@ export async function POST(request: Request): Promise<Response> {
         );
     }
 
-    const pricingResult = calculatePricing(registration.delegates.length);
-    if (!pricingResult.success) {
-        const status = pricingResult.code === "REGISTRATION_CLOSED" ? 410 : 400;
-        return Response.json(
-            { success: false, error: pricingResult.error, code: pricingResult.code },
-            { status },
-        );
+    let pricingResult: ReturnType<typeof calculatePricingAtRate>;
+    try {
+        const challanTokenHash = createHash("sha256").update(registration.reservationToken).digest("hex");
+        const reservedChallan = await Challan.findOne({
+            environment: CHALLAN_ENVIRONMENT,
+            reservationTokenHash: challanTokenHash,
+            registrationFingerprint: registrationFingerprint(body),
+            status: "Reserved",
+            graceUntil: { $gt: new Date() },
+        }).select("category rateType amount").lean<{ category: string; rateType: "Early bird" | "Regular"; amount: number }>();
+        const expectedCategory = registration.delegates.length === 1 ? "solo" : `delegation-${registration.delegates.length}`;
+        pricingResult = calculatePricingAtRate(registration.delegates.length, reservedChallan?.rateType ?? "Early bird");
+        if (!reservedChallan || reservedChallan.category !== expectedCategory || !pricingResult.success || reservedChallan.amount !== pricingResult.pricing.totalPayable) {
+            return Response.json({ success: false, error: "This challan has expired or no longer matches your details. Generate a new challan and upload the receipt again." }, { status: 409 });
+        }
+    } catch (error) {
+        console.error("Challan validation failed:", error);
+        return Response.json({ success: false, error: "The challan could not be validated. Please try again." }, { status: 503 });
     }
 
     const receiptResult = await processReceipt(formData.get("receipt"));
@@ -385,7 +417,25 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     try {
+        let registeredChallanNumber = "";
         await withTransaction(async (session) => {
+            const challanTokenHash = createHash("sha256").update(registration.reservationToken).digest("hex");
+            const fingerprint = registrationFingerprint(body);
+            const challan = await Challan.findOneAndUpdate({
+                environment: CHALLAN_ENVIRONMENT,
+                reservationTokenHash: challanTokenHash,
+                registrationFingerprint: fingerprint,
+                status: "Reserved",
+                graceUntil: { $gt: new Date() },
+                amount: pricingResult.pricing.totalPayable,
+                rateType: pricingResult.pricing.rateType,
+            }, {
+                $set: { status: "Submitted", applicationId },
+                $unset: { reservationTokenHash: 1, registrationFingerprint: 1, reservationContactHash: 1, expiresAt: 1, graceUntil: 1 },
+            }, { session, returnDocument: "after" }).lean<{ challanNumber: string }>();
+            if (!challan) throw new Error("The challan reservation is expired or does not match the registration details.");
+            registeredChallanNumber = challan.challanNumber;
+
             await Application.create(
                 [
                     {
@@ -393,6 +443,7 @@ export async function POST(request: Request): Promise<Response> {
                         participantType: registration.participantType,
                         delegateCount: registration.delegates.length,
                         institution: registration.institution,
+                        ...(registration.baCode ? { baCode: registration.baCode } : {}),
                         contactName: registration.contact.name,
                         contactEmail: registration.contact.email,
                         contactWhatsapp: registration.contact.whatsapp,
@@ -427,6 +478,9 @@ export async function POST(request: Request): Promise<Response> {
                         applicationId,
                         totalPayable: pricingResult.pricing.totalPayable,
                         rateType: pricingResult.pricing.rateType,
+                        challanNumber: challan.challanNumber,
+                        challanEnvironment: CHALLAN_ENVIRONMENT,
+                        delegationFee: pricingResult.pricing.delegationFee,
                         receiptUrl: receiptUrlFor(receiptFileId),
                         receiptFileId,
                         receiptMime: receipt.mime,
@@ -449,11 +503,17 @@ export async function POST(request: Request): Promise<Response> {
                 rateType: pricingResult.pricing.rateType,
                 participantType: registration.participantType,
                 delegateCount: registration.delegates.length,
+                challanNumber: registeredChallanNumber,
+                delegationFee: pricingResult.pricing.delegationFee,
+                challanEnvironment: CHALLAN_ENVIRONMENT,
             }),
         );
-        return successResponse(applicationId, registration.contact.name, pricingResult.pricing);
+        return successResponse(applicationId, registration.contact.name, pricingResult.pricing, 201, registeredChallanNumber, CHALLAN_ENVIRONMENT);
     } catch (error) {
         await deleteReceipt(receiptFileId);
+        if (error instanceof Error && error.message.startsWith("The challan reservation is expired or does not match")) {
+            return Response.json({ success: false, error: "This challan has expired or no longer matches your details. Generate a new challan and upload the receipt again." }, { status: 409 });
+        }
         if (isRecord(error) && error.code === 11000) {
             return Response.json(
                 { success: false, error: "A registration with conflicting unique data already exists." },

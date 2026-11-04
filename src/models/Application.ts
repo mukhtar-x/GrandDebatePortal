@@ -17,6 +17,7 @@ export interface IApplication {
     /** Persisted count used to validate delegation size; optional for legacy records. */
     delegateCount?: number;
     institution?: string;
+    baCode?: string;
     status: (typeof APPLICATION_STATUSES)[number];
     contactName?: string;
     contactEmail?: string;
@@ -55,6 +56,7 @@ const applicationSchema = new Schema<IApplication>(
             },
             trim: true,
         },
+        baCode: { type: String, trim: true, maxlength: 50 },
         status: {
             type: String,
             enum: APPLICATION_STATUSES,
