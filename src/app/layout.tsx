@@ -22,9 +22,8 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  metadataBase:
-    getPublicSiteUrl() ??
-    (process.env.NODE_ENV === "development" ? new URL("http://localhost:3000") : undefined),
+  // Vercel always provides VERCEL_URL; the localhost fallback only applies to local builds.
+  metadataBase: getPublicSiteUrl() ?? new URL(`http://localhost:${process.env.PORT ?? 3000}`),
   title: {
     default: "The Grand Debate ’26 - TLC",
     template: "%s - TGD'26",

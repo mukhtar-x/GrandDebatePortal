@@ -21,6 +21,8 @@ export interface RegistrationInput {
   baCode: string;
   idempotencyKey: string;
   reservationToken: string;
+  /** Honeypot; real users leave it empty. */
+  website: string;
 }
 
 export interface RegistrationSuccess {
@@ -40,11 +42,14 @@ export interface ChallanReservation {
   expiresAt: string;
   graceUntil: string;
   test: boolean;
+  resumed?: boolean;
 }
 
-export type RegistrationResult =
-  | { ok: true; data: RegistrationSuccess }
-  | { ok: false; error: string; field?: string };
+export type ApiFailure = { ok: false; error: string; field?: string; code?: string };
+
+export type RegistrationResult = { ok: true; data: RegistrationSuccess } | ApiFailure;
+
+export type ReservationResult = { ok: true; data: ChallanReservation } | ApiFailure;
 
 function toApiExperience(value: string) {
   return EXPERIENCE_TO_API[value] ?? value;
@@ -95,6 +100,7 @@ function buildPayload(input: RegistrationInput) {
     transactionId: input.transactionId.trim() || undefined,
     baCode: input.baCode.trim() || undefined,
     idempotencyKey: input.idempotencyKey,
+    website: input.website,
   };
 
   return {
@@ -133,18 +139,32 @@ export function describeField(field: string, type: RegistrationType) {
   return FIELD_LABELS[field] ?? field;
 }
 
-export async function reserveChallan(registration: ReturnType<typeof buildRegistrationDetails>) {
+export async function reserveChallan(input: {
+  registration: ReturnType<typeof buildRegistrationDetails>;
+  /** Links every challan generated during one form fill; the same key is used to submit. */
+  draftId: string;
+  /** The challan being replaced, if the details changed after it was generated. */
+  previousReservationToken?: string;
+  website: string;
+}): Promise<ReservationResult> {
   try {
     const response = await fetch("/api/challans/reserve", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ registration }),
+      body: JSON.stringify(input),
     });
     const body = await response.json().catch(() => null);
-    if (!response.ok || !body?.success) return { ok: false as const, error: body?.error ?? "A challan could not be reserved." };
-    return { ok: true as const, data: body as ChallanReservation };
+    if (!response.ok || !body?.success) {
+      return {
+        ok: false,
+        error: body?.error ?? "A challan could not be reserved. Please try again.",
+        field: body?.field,
+        code: body?.code,
+      };
+    }
+    return { ok: true, data: body as ChallanReservation };
   } catch {
-    return { ok: false as const, error: "We could not reach the server. Please try again." };
+    return { ok: false, error: "We could not reach the server. Please check your connection and try again." };
   }
 }
 
@@ -185,6 +205,7 @@ export async function submitRegistration(input: RegistrationInput): Promise<Regi
       ok: false,
       error: body?.error ?? "Registration could not be completed. Please try again.",
       field: body?.field,
+      code: body?.code,
     };
   } catch {
     return {

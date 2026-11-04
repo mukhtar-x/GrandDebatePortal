@@ -1,4 +1,5 @@
 import { requireAdmin, requireAdminMutation } from "@/lib/adminAuth";
+import { loadChallanHistories } from "@/lib/challanHistory";
 import connectDB from "@/lib/db";
 import { readJsonBody } from "@/lib/requestGuards";
 import { withTransaction } from "@/lib/transaction";
@@ -24,10 +25,15 @@ export async function GET(
         }
         const [delegates, payment] = await Promise.all([
             Delegate.find({ applicationId }).select("-__v").sort({ isHead: -1, createdAt: 1 }).lean(),
-            Payment.findOne({ applicationId }).select("-__v").lean(),
+            Payment.findOne({ applicationId }).select("-__v").lean<{ challanNumber?: string; otherChallanNumbers?: string[] }>(),
+        ]);
+        // The submitted challan first, then any others this applicant generated beforehand.
+        const challans = await loadChallanHistories([
+            ...(payment?.challanNumber ? [payment.challanNumber] : []),
+            ...(payment?.otherChallanNumbers ?? []),
         ]);
 
-        return Response.json({ success: true, application, delegates, payment });
+        return Response.json({ success: true, application, delegates, payment, challans });
     } catch (error) {
         console.error("Admin application lookup failed:", error);
         return Response.json({ success: false, error: "Application could not be loaded." }, { status: 500 });

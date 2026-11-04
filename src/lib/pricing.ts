@@ -1,12 +1,14 @@
 import {
+    DELEGATION_FEE,
     EARLY_BIRD_ENDS_AT,
     MAX_DELEGATION_SIZE,
     MIN_DELEGATION_SIZE,
     REGISTRATION_ENDS_AT,
+    REGISTRATION_FEES,
 } from "@/data/event";
 
-export const EARLY_BIRD_PRICE = 2000;
-export const REGULAR_PRICE = 2400;
+export const EARLY_BIRD_PRICE = REGISTRATION_FEES.earlyBird;
+export const REGULAR_PRICE = REGISTRATION_FEES.regular;
 export const REGULAR_RATE_START = new Date(EARLY_BIRD_ENDS_AT);
 export const EARLY_BIRD_DEADLINE = new Date(REGULAR_RATE_START.getTime() - 1);
 export const REGISTRATION_CLOSED_AT = new Date(REGISTRATION_ENDS_AT);
@@ -29,7 +31,7 @@ export function calculatePricingAtRate(
     const validCount = Number.isInteger(delegateCount) && (delegateCount === 1 || (delegateCount >= MIN_DELEGATION_SIZE && delegateCount <= MAX_DELEGATION_SIZE));
     if (!validCount) return { success: false, code: "INVALID_PRICING_INPUT", error: "Delegate count is invalid." };
     const pricePerDelegate = rateType === "Early bird" ? EARLY_BIRD_PRICE : REGULAR_PRICE;
-    const delegationFee = delegateCount > 1 ? 500 : 0;
+    const delegationFee = delegateCount > 1 ? DELEGATION_FEE : 0;
     return {
         success: true,
         pricing: {
@@ -61,16 +63,5 @@ export function calculatePricing(delegateCount: number, date = new Date()): Pric
         };
     }
 
-    const isEarlyBird = date < REGULAR_RATE_START;
-    const pricePerDelegate = isEarlyBird ? EARLY_BIRD_PRICE : REGULAR_PRICE;
-
-    return {
-        success: true,
-        pricing: {
-            totalPayable: pricePerDelegate * delegateCount + (delegateCount > 1 ? 500 : 0),
-            rateType: isEarlyBird ? "Early bird" : "Regular",
-            pricePerDelegate,
-            delegationFee: delegateCount > 1 ? 500 : 0,
-        },
-    };
+    return calculatePricingAtRate(delegateCount, date < REGULAR_RATE_START ? "Early bird" : "Regular");
 }

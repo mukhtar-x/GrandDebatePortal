@@ -1,9 +1,10 @@
+import { DELEGATION_FEE, REGISTRATION_FEES } from "@/data/event";
 import Challan from "@/models/Challan";
-import { getChallanDetails } from "@/lib/challans";
+import { challanCategory } from "@/lib/challans";
 
 const WINDOWS = [
-    { rateType: "Early bird" as const, prefix: 42, perDelegate: 2000 },
-    { rateType: "Regular" as const, prefix: 48, perDelegate: 2400 },
+    { rateType: "Early bird" as const, prefix: 42, perDelegate: REGISTRATION_FEES.earlyBird },
+    { rateType: "Regular" as const, prefix: 48, perDelegate: REGISTRATION_FEES.regular },
 ];
 const CATEGORY_COUNTS = [
     { count: 1, quantity: 900 },
@@ -18,14 +19,18 @@ let seedPromise: Promise<void> | null = null;
 /** Creates an unmistakable, finite TEST- prefixed inventory, idempotently, for staging. */
 export function ensureTestChallanPool(): Promise<void> {
     seedPromise ??= (async () => {
+        // Pools created before the per-window fix priced every Regular challan at the early-bird rate.
+        await Promise.all(WINDOWS.flatMap((window) => CATEGORY_COUNTS.map((item) => Challan.updateMany(
+            { environment: "test", category: challanCategory(item.count), rateType: window.rateType, status: { $ne: "Submitted" } },
+            { $set: { amount: window.perDelegate * item.count + (item.count > 1 ? DELEGATION_FEE : 0) } },
+        ))));
         const currentCount = await Challan.countDocuments({ environment: "test" });
         if (currentCount >= 3000) return;
         const operations = [];
         for (const window of WINDOWS) {
             let serial = window.prefix * 1000 + 1;
             for (const item of CATEGORY_COUNTS) {
-                const details = getChallanDetails(item.count === 1 ? "solo" : "delegation", item.count);
-                if (!details) continue;
+                const category = challanCategory(item.count);
                 for (let index = 0; index < item.quantity; index += 1) {
                     const challanNumber = `TEST-${serial++}`;
                     operations.push({
@@ -34,10 +39,11 @@ export function ensureTestChallanPool(): Promise<void> {
                             update: { $setOnInsert: {
                                 challanNumber,
                                 environment: "test",
-                                category: details.category,
+                                category,
                                 rateType: window.rateType,
-                                amount: details.pricePerDelegate * item.count + (item.count > 1 ? 500 : 0),
+                                amount: window.perDelegate * item.count + (item.count > 1 ? DELEGATION_FEE : 0),
                                 status: "Available",
+                                issueCount: 0,
                             } },
                             upsert: true,
                         },

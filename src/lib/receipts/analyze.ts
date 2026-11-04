@@ -72,6 +72,28 @@ function duplicateFlags(
         .map(([code, ids]) => ({ code, severity: "high" as const, detail: DUPLICATE_DETAILS[code](ids.join(", ")) }));
 }
 
+const compact = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+/** Compares challan numbers printed on the receipt with the one the registration was submitted with. */
+function challanMismatchFlag(payment: IPayment, text: string): IReceiptFlag | null {
+    if (!payment.challanNumber) return null;
+    const receiptText = compact(text);
+    if (receiptText.includes(compact(payment.challanNumber))) return null;
+    const earlier = (payment.otherChallanNumbers ?? []).find((number) => receiptText.includes(compact(number)));
+    if (earlier) {
+        return {
+            code: "EARLIER_CHALLAN",
+            severity: "high",
+            detail: `The receipt shows challan ${earlier}, which this applicant generated earlier, not the submitted challan ${payment.challanNumber}.`,
+        };
+    }
+    return {
+        code: "CHALLAN_NOT_FOUND",
+        severity: "low",
+        detail: `Challan ${payment.challanNumber} could not be read on the receipt.`,
+    };
+}
+
 function contentFlags(payment: IPayment, parsed: ParsedReceipt, text: string): IReceiptFlag[] {
     const flags: IReceiptFlag[] = [];
     const readable = text.replace(/\s+/g, "").length >= 20;
@@ -110,6 +132,9 @@ function contentFlags(payment: IPayment, parsed: ParsedReceipt, text: string): I
             detail: `Applicant entered ${typedTxn}; the receipt shows ${parsed.transactionId}.`,
         });
     }
+
+    const challanFlag = readable ? challanMismatchFlag(payment, text) : null;
+    if (challanFlag) flags.push(challanFlag);
 
     const account = PAYMENT_DETAILS.accountNumber?.replace(/\D/g, "");
     if (readable && account && account.length >= 4) {

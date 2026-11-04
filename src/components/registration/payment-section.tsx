@@ -1,54 +1,83 @@
-import {
-  formatPKR,
-  MAX_DELEGATION_SIZE,
-  MIN_DELEGATION_SIZE,
-  REGISTRATION_FEES,
-} from "@/data/event";
+import { useState, type Ref } from "react";
 import { InputField } from "@/components/ui/form-fields";
-import { useEffect, useState } from "react";
-
-interface ReservationView {
-  challanNumber: string;
-  amount: number;
-  rateType: string;
-  expiresAt: string;
-  graceUntil: string;
-  test: boolean;
-}
+import { DELEGATION_FEE, RECEIPT_MAX_BYTES, RECEIPT_TYPES, formatPKR } from "@/data/event";
+import type { ChallanReservation } from "@/lib/api/registration";
 
 interface PaymentSectionProps {
   delegateCount: number;
-  feePerDelegate: number;
-  rateLabel: string;
+  reservation: ChallanReservation | null;
+  /** Current time in ms, ticking each second; 0 until the browser clock is read. */
+  now: number;
   receiptName: string;
   onReceiptChange: (file: File | null) => void;
-  reservation: ReservationView | null;
+  transactionId: string;
+  onTransactionIdChange: (value: string) => void;
   onRegenerate: () => void;
+  regenerating: boolean;
   onEditDetails: () => void;
+  headingRef: Ref<HTMLHeadingElement>;
+}
+
+const MAX_TRANSACTION_ID_LENGTH = 64;
+
+type Phase = "loading" | "reserved" | "grace" | "expired";
+
+function formatCountdown(ms: number) {
+  const seconds = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
+}
+
+/** Returns an error message for a receipt the server would refuse, so it is not uploaded first. */
+function receiptProblem(file: File): string | null {
+  if (!(RECEIPT_TYPES as readonly string[]).includes(file.type)) {
+    return "Upload a JPG, PNG or WebP image, or a PDF.";
+  }
+  if (file.size > RECEIPT_MAX_BYTES) {
+    return `This file is larger than ${RECEIPT_MAX_BYTES / (1024 * 1024)} MB. Upload a smaller screenshot.`;
+  }
+  return null;
 }
 
 export function PaymentSection({
   delegateCount,
-  feePerDelegate,
-  rateLabel,
+  reservation,
+  now,
   receiptName,
   onReceiptChange,
-  reservation,
+  transactionId,
+  onTransactionIdChange,
   onRegenerate,
+  regenerating,
   onEditDetails,
+  headingRef,
 }: PaymentSectionProps) {
-  const delegationFee = delegateCount > 1 ? 500 : 0;
-  const serverFeePerDelegate = reservation?.rateType === "Early bird" ? 2000 : reservation?.rateType === "Regular" ? 2400 : feePerDelegate;
-  const total = reservation?.amount ?? delegateCount * feePerDelegate + delegationFee;
-  const [now, setNow] = useState(0);
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-  const graceLeft = reservation && now > 0 ? Math.max(0, Math.ceil((new Date(reservation.graceUntil).getTime() - now) / 1000)) : 0;
-  const reservationLeft = reservation && now > 0 ? Math.max(0, Math.ceil((new Date(reservation.expiresAt).getTime() - now) / 1000)) : 0;
-  const countdown = reservationLeft > 0 ? reservationLeft : graceLeft;
-  const timerLabel = now === 0 ? "--:--" : `${Math.floor(countdown / 60).toString().padStart(2, "0")}:${(countdown % 60).toString().padStart(2, "0")}`;
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const expiresAt = reservation ? Date.parse(reservation.expiresAt) : 0;
+  const graceUntil = reservation ? Date.parse(reservation.graceUntil) : 0;
+  const phase: Phase = now === 0 ? "loading" : now < expiresAt ? "reserved" : now < graceUntil ? "grace" : "expired";
+  const delegationFee = delegateCount > 1 ? DELEGATION_FEE : 0;
+  const perDelegate = reservation ? (reservation.amount - delegationFee) / delegateCount : 0;
+
+  async function copyChallanNumber() {
+    if (!reservation) return;
+    try {
+      await navigator.clipboard.writeText(reservation.challanNumber);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard access can be blocked; the number stays visible and selectable.
+    }
+  }
+
+  function handleReceipt(input: HTMLInputElement) {
+    const file = input.files?.[0] ?? null;
+    const problem = file ? receiptProblem(file) : null;
+    setReceiptError(problem);
+    if (problem) input.value = "";
+    onReceiptChange(problem ? null : file);
+  }
 
   return (
     <section className="form-card payment-card">
@@ -56,53 +85,104 @@ export function PaymentSection({
         <div className="section-heading-icon">04</div>
         <div>
           <p className="section-overline">Step 4 of 4</p>
-          <h2>Payment</h2>
+          <h2 ref={headingRef} tabIndex={-1}>Pay and upload your receipt</h2>
         </div>
-        <button className="button button-quiet" type="button" onClick={onEditDetails}>Edit details</button>
       </div>
 
-      <div className="payment-total">
-        <div>
-          <span className="payment-label">Total payable</span>
-          <span className="payment-rate">
-            {delegateCount} {delegateCount === 1 ? "delegate" : "delegates"} ·{" "}
-            {formatPKR(serverFeePerDelegate)} each · {reservation?.rateType ?? rateLabel} rate{delegationFee ? ` · ${formatPKR(delegationFee)} delegation fee` : ""}
-          </span>
-        </div>
-        <strong>{formatPKR(total)}</strong>
-      </div>
+      {reservation ? (
+        <>
+          {reservation.test ? (
+            <div className="challan-test-banner" role="note">
+              <strong>Test challan: do not make a real payment.</strong>
+              <span>This site is running in test mode. Live FAST challans have not been loaded.</span>
+            </div>
+          ) : null}
 
-      {reservation ? <div className="payment-instructions">
-        <span className="payment-icon" aria-hidden="true">
-          #
-        </span>
-        <div>
-          <strong>QuickPay challan: {reservation.challanNumber}</strong>
-          <p>
-            Pay exactly {formatPKR(reservation.amount)} using this challan. {now === 0 ? "Loading reservation timer…" : reservationLeft > 0 ? `Upload your receipt within ${timerLabel}; a 15-minute grace period follows.` : graceLeft > 0 ? `The 30-minute window ended. Upload during the ${timerLabel} grace period.` : "The reservation has expired."}
+          <div className="challan-card">
+            <div className="challan-number">
+              <span className="payment-label">QuickPay challan number</span>
+              <div className="challan-number-row">
+                <strong>{reservation.challanNumber}</strong>
+                <button className="button button-quiet challan-copy" type="button" onClick={() => void copyChallanNumber()}>
+                  {copied ? "Copied" : "Copy"}
+                </button>
+              </div>
+            </div>
+            <div className="challan-amount">
+              <span className="payment-label">Pay exactly</span>
+              <strong>{formatPKR(reservation.amount)}</strong>
+              <span className="payment-rate">
+                {delegateCount} × {formatPKR(perDelegate)} ({reservation.rateType} rate)
+                {delegationFee ? ` + ${formatPKR(delegationFee)} delegation fee` : ""}
+              </span>
+            </div>
+          </div>
+
+          <div className={`challan-timer is-${phase}`} role="timer">
+            {phase === "expired" ? (
+              <>
+                <div>
+                  <strong>This challan has expired.</strong>
+                  <span>Do not pay challan {reservation.challanNumber}. Generate a new challan to continue.</span>
+                </div>
+                <button className="button button-primary" type="button" onClick={onRegenerate} disabled={regenerating} aria-busy={regenerating}>
+                  {regenerating ? "Generating…" : "Generate new challan"}
+                </button>
+              </>
+            ) : (
+              <>
+                <div>
+                  <strong>{phase === "grace" ? "Grace period: submit now" : "Time left to pay and submit"}</strong>
+                  <span>
+                    {phase === "grace"
+                      ? "The 30-minute window has ended. You can still submit your receipt until the timer runs out."
+                      : "A 15-minute grace period follows if you need a little longer."}
+                  </span>
+                </div>
+                <span className="challan-countdown">{phase === "loading" ? "--:--" : formatCountdown((phase === "reserved" ? expiresAt : graceUntil) - now)}</span>
+              </>
+            )}
+          </div>
+          <p className="visually-hidden" aria-live="polite">
+            {phase === "grace" ? "The grace period has started. Submit your receipt now." : phase === "expired" ? "The challan has expired." : ""}
           </p>
-          {reservation.test ? <p><strong>TEST CHALLAN — do not make a real payment.</strong> FAST challans have not been loaded yet.</p> : null}
-        </div>
-      </div> : <div className="payment-instructions"><span className="payment-icon" aria-hidden="true">!</span><div><strong>No challan reserved</strong><p>Go back to review your details and generate a challan before uploading payment.</p></div></div>}
 
-      {reservation && now > 0 && graceLeft === 0 ? <div className="lookup-error" role="alert"><p>This challan reservation has expired. Generate a new challan to continue.</p><button className="button button-quiet" type="button" onClick={onRegenerate}>Generate new challan</button></div> : null}
+          <ol className="payment-steps">
+            <li>Pay exactly <strong>{formatPKR(reservation.amount)}</strong> against challan <strong>{reservation.challanNumber}</strong>.</li>
+            <li>Save the payment screenshot or receipt. The amount, date and challan number should be readable.</li>
+            <li>Upload it below and submit before the timer ends.</li>
+          </ol>
+        </>
+      ) : (
+        <div className="payment-instructions">
+          <span className="payment-icon" aria-hidden="true">!</span>
+          <div>
+            <strong>No challan reserved</strong>
+            <p>Go back to review your details and generate a challan before paying.</p>
+          </div>
+        </div>
+      )}
 
       <div className="field-grid">
-        <label className="field">
+        <label className="field" htmlFor="payment-receipt">
           <span className="field-label">Payment screenshot</span>
           <input
             className="form-control file-control"
             id="payment-receipt"
             name="paymentReceipt"
             type="file"
-            accept="image/*,.pdf,application/pdf"
-            onChange={(event) => onReceiptChange(event.currentTarget.files?.[0] ?? null)}
-            required
+            accept={RECEIPT_TYPES.join(",")}
+            onChange={(event) => handleReceipt(event.currentTarget)}
+            aria-invalid={receiptError ? true : undefined}
+            aria-describedby="payment-receipt-hint"
+            disabled={!reservation || phase === "expired"}
+            required={!receiptName}
           />
-          <span className="field-hint">
-            Image or PDF. The amount and transfer date should be clearly legible.
+          <span className="field-hint" id="payment-receipt-hint">
+            JPG, PNG, WebP or PDF, up to {RECEIPT_MAX_BYTES / (1024 * 1024)} MB.
           </span>
-          {receiptName ? (
+          {receiptError ? <span className="field-error" role="alert">{receiptError}</span> : null}
+          {receiptName && !receiptError ? (
             <span className="selected-file" role="status">
               Selected: {receiptName}
             </span>
@@ -113,38 +193,18 @@ export function PaymentSection({
           name="transactionId"
           label="Transaction ID"
           placeholder="Optional"
+          maxLength={MAX_TRANSACTION_ID_LENGTH}
+          value={transactionId}
+          onChange={(event) => onTransactionIdChange(event.currentTarget.value)}
           hint="This helps organisers verify your payment promptly."
         />
       </div>
 
-      {delegateCount > 1 ? (
-        <details className="fee-table">
-          <summary>View delegation fee totals</summary>
-          <div className="fee-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Delegates</th>
-                  <th scope="col">Early bird</th>
-                  <th scope="col">Regular</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from(
-                  { length: MAX_DELEGATION_SIZE - MIN_DELEGATION_SIZE + 1 },
-                  (_, index) => MIN_DELEGATION_SIZE + index,
-                ).map((count) => (
-                  <tr key={count} className={count === delegateCount ? "is-selected" : ""}>
-                    <th scope="row">{count}</th>
-                    <td>{formatPKR(count * REGISTRATION_FEES.earlyBird + 500)}</td>
-                    <td>{formatPKR(count * REGISTRATION_FEES.regular + 500)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </details>
-      ) : null}
+      <div className="form-navigation">
+        <button className="button button-quiet" type="button" onClick={onEditDetails}>
+          Back to review
+        </button>
+      </div>
     </section>
   );
 }

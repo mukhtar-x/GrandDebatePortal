@@ -33,10 +33,22 @@ export const EXPERIENCE_OPTIONS = [
   "Chair or Executive Board experience",
 ] as const;
 
+export const REGISTRATION_FEES = {
+  earlyBird: 2000,
+  regular: 2400,
+} as const;
+
+/** Flat fee added once to every delegation (not per delegate). */
+export const DELEGATION_FEE = 500;
+
+/** Largest payment receipt accepted, checked in the browser and again on the server. */
+export const RECEIPT_MAX_BYTES = 4 * 1024 * 1024;
+export const RECEIPT_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"] as const;
+
 const EARLY_BIRD_WINDOW = {
   key: "earlyBird",
   name: "Early bird",
-  feePerDelegate: 2000,
+  feePerDelegate: REGISTRATION_FEES.earlyBird,
   deadline: "12 November 2026",
   description:
     "Early bird registration is open until 12 November. Delegates who register now pay PKR 2,000 instead of PKR 2,400.",
@@ -45,7 +57,7 @@ const EARLY_BIRD_WINDOW = {
 const REGULAR_WINDOW = {
   key: "regular",
   name: "Regular",
-  feePerDelegate: 2400,
+  feePerDelegate: REGISTRATION_FEES.regular,
   deadline: "18 November 2026",
   description:
     "Early bird registration has closed. Regular registration remains open through 18 November. Delegate fee: PKR 2,400.",
@@ -72,11 +84,6 @@ export function getCurrentRegistrationWindow(now = new Date()): RegistrationWind
   if (now < new Date(REGISTRATION_ENDS_AT)) return REGULAR_WINDOW;
   return CLOSED_WINDOW;
 }
-
-export const REGISTRATION_FEES = {
-  earlyBird: 2000,
-  regular: 2400,
-} as const;
 
 export function formatPKR(amount: number) {
   return "PKR " + amount.toLocaleString("en-PK");

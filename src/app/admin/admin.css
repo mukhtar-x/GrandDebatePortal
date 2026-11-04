@@ -293,3 +293,8 @@
 @media (prefers-reduced-motion: reduce) {
   .admin-screen *, .admin-screen *::before, .admin-screen *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+.admin-challan-history { margin: 12px 0 18px; padding: 13px 15px; border: 1px solid #e5e1d8; border-radius: 8px; background: #fff; color: #35435a; font-size: 11px; }
+.admin-challan-history-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.admin-challan-history-heading .admin-risk-badge { margin-top: 0; }
+.admin-challan-lookup { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }

@@ -22,7 +22,10 @@ export function SiteNavigation() {
   const pathname = usePathname();
   const mobileMenu = useRef<HTMLDivElement>(null);
   const mobileToggle = useRef<HTMLButtonElement>(null);
-  const [isOpen, setIsOpen] = useState(false);
+  // The menu is open only on the path where it was opened, so navigating closes it.
+  const [openPath, setOpenPath] = useState<string | null>(null);
+  const isOpen = openPath === pathname;
+  const setIsOpen = (open: boolean) => setOpenPath(open ? pathname : null);
   const active: ActiveRoute =
     pathname === "/"
       ? "home"
@@ -36,20 +39,18 @@ export function SiteNavigation() {
               ? "archive"
               : null;
 
-  useEffect(() => setIsOpen(false), [pathname]);
-
   useEffect(() => {
     if (!isOpen) return;
 
     function handlePointerDown(event: PointerEvent) {
       if (event.target instanceof Node && !mobileMenu.current?.contains(event.target)) {
-        setIsOpen(false);
+        setOpenPath(null);
       }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setIsOpen(false);
+        setOpenPath(null);
         mobileToggle.current?.focus();
       }
     }
@@ -85,7 +86,7 @@ export function SiteNavigation() {
           aria-label={isOpen ? "Close site navigation" : "Open site navigation"}
           aria-expanded={isOpen}
           aria-controls="mobile-navigation-panel"
-          onClick={() => setIsOpen((open) => !open)}
+          onClick={() => setIsOpen(!isOpen)}
         >
           <span />
           <span />

@@ -48,6 +48,9 @@ interface ApplicationRow {
         totalPayable?: number;
         delegationFee?: number;
         challanNumber?: string;
+        otherChallanNumbers?: string[];
+        /** Times the submitted challan was issued; more than 1 means it was reused. */
+        challanIssueCount?: number;
         challanEnvironment?: "test" | "live";
         transactionId?: string;
         receiptFileId?: string;
@@ -69,6 +72,40 @@ interface ApplicationDetail {
         }
     >;
     payment?: ApplicationRow["payment"];
+    challans?: ChallanHistory[];
+}
+
+interface ChallanHistory {
+    challanNumber: string;
+    environment?: "test" | "live";
+    category?: string;
+    rateType?: string;
+    amount?: number;
+    status?: string;
+    issueCount: number;
+    applicationId?: string;
+    reused: boolean;
+    issues: Array<{
+        issueNumber: number;
+        status: string;
+        contactName: string;
+        contactEmail: string;
+        contactWhatsapp: string;
+        institution: string;
+        participantType: string;
+        delegateCount: number;
+        baCode?: string;
+        reservedAt: string;
+        graceUntil: string;
+        endedAt?: string;
+        applicationId?: string;
+        linkedApplicationId?: string;
+    }>;
+}
+
+interface InventoryRow {
+    _id: { environment: "test" | "live"; category: string; rateType: string; amount: number; status: string };
+    count: number;
 }
 
 interface Committee {
@@ -187,7 +224,7 @@ export default function AdminDashboard() {
     const [loginBusy, setLoginBusy] = useState(false);
     const [error, setError] = useState("");
     const [toast, setToast] = useState("");
-    const [activeView, setActiveView] = useState<"applications" | "committees" | "ambassadors">("applications");
+    const [activeView, setActiveView] = useState<"applications" | "committees" | "ambassadors" | "challans">("applications");
     const [allocatedQuery, setAllocatedQuery] = useState("");
     const [allocatedCommittee, setAllocatedCommittee] = useState("");
     const [query, setQuery] = useState("");
@@ -210,6 +247,10 @@ export default function AdminDashboard() {
     const [batchBusy, setBatchBusy] = useState(false);
     const [committeeBusy, setCommitteeBusy] = useState("");
     const dashboardRequestId = useRef(0);
+    const handleUnauthorized = useCallback(() => {
+        setAuthenticated(false);
+        setError("Your admin session has expired. Sign in again to continue.");
+    }, []);
 
     const loadDashboard = useCallback(async () => {
         const requestId = ++dashboardRequestId.current;
@@ -643,6 +684,7 @@ export default function AdminDashboard() {
                     <button className={activeView === "applications" ? "is-active" : ""} type="button" role="tab" aria-selected={activeView === "applications"} onClick={() => setActiveView("applications")}>Applications</button>
                     <button className={activeView === "committees" ? "is-active" : ""} type="button" role="tab" aria-selected={activeView === "committees"} onClick={() => setActiveView("committees")}>Committee allocations</button>
                     <button className={activeView === "ambassadors" ? "is-active" : ""} type="button" role="tab" aria-selected={activeView === "ambassadors"} onClick={() => setActiveView("ambassadors")}>Brand ambassadors</button>
+                    <button className={activeView === "challans" ? "is-active" : ""} type="button" role="tab" aria-selected={activeView === "challans"} onClick={() => setActiveView("challans")}>Challans</button>
                 </div>
 
                 {activeView === "applications" ? (
@@ -654,7 +696,7 @@ export default function AdminDashboard() {
                                 <button className="admin-button admin-button-outline" type="button" onClick={() => void runReceiptBatch()} disabled={batchBusy || data.pendingChecks === 0}>
                                     {batchBusy ? "Checking receipts…" : `Run receipt checks (${data.pendingChecks})`}
                                 </button>
-                                <label className="admin-search"><span aria-hidden="true">⌕</span><input aria-label="Search applications" placeholder="Search ID, delegate, email or institution" value={query} onChange={(event) => setSearch(event.target.value)} /></label>
+                                <label className="admin-search"><span aria-hidden="true">⌕</span><input aria-label="Search applications" placeholder="Search ID, delegate, email, institution or challan" value={query} onChange={(event) => setSearch(event.target.value)} /></label>
                                 <select aria-label="Filter by application stage" value={stage} onChange={(event) => setStageFilter(event.target.value)}>
                                     <option value="">All stages</option>
                                     {APPLICATION_STAGES.map((status) => <option value={status} key={status}>{status}</option>)}
@@ -768,6 +810,8 @@ export default function AdminDashboard() {
                             })} />
                         </section>
                     </section>
+                ) : activeView === "challans" ? (
+                    <ChallansView onUnauthorized={handleUnauthorized} />
                 ) : (
                     <BrandAmbassadorsView ambassadors={data.ambassadors} allocations={data.ambassadorAllocations} />
                 )}
@@ -830,6 +874,8 @@ function ApplicationRows({
                 <strong>{displayPaymentStatus(application.payment?.paymentStatus)}</strong>
                 <span className="admin-cell-sub">{typeof application.payment?.totalPayable === "number" ? formatMoney(application.payment.totalPayable) : "—"}</span>
                 {application.payment?.challanNumber && <span className="admin-cell-sub">Challan: {application.payment.challanNumber}{application.payment.challanEnvironment === "test" ? " · TEST" : ""}</span>}
+                {(application.payment?.challanIssueCount ?? 0) > 1 && <span className="admin-risk-badge risk-high" title="This challan number was given to more than one applicant. Check its history before verifying.">Reused challan · issued {application.payment?.challanIssueCount}×</span>}
+                {application.payment?.otherChallanNumbers?.length ? <span className="admin-cell-sub">Also generated: {application.payment.otherChallanNumbers.join(", ")}</span> : null}
                 {application.payment?.transactionId && <span className="admin-cell-sub">Txn: {application.payment.transactionId}</span>}
                 {application.payment?.reviewReason && <span className="admin-cell-sub admin-reason">{application.payment.reviewReason}</span>}
                 {application.payment?.analysis && <span className={`admin-risk-badge risk-${application.payment.analysis.riskLevel}`}>{application.payment.analysis.riskLevel} risk · {application.payment.analysis.riskScore}</span>}
@@ -856,6 +902,7 @@ function ApplicationRows({
                 </div>
             )}
             {!detail.payment?.receiptFileId && <div className="admin-receipt-missing"><strong>Receipt file unavailable</strong><span>{detail.payment ? "The payment record has no stored receipt file. Check the upload status before verifying." : "No payment record is attached to this application."}</span></div>}
+            {detail.challans?.map((history) => <ChallanHistoryPanel key={history.challanNumber} history={history} submittedFor={detail.application.applicationId} />)}
             {detail.payment?.analysis && <ReceiptAnalysisPanel analysis={detail.payment.analysis} />}
             {detail.payment?.analysis && <p className="admin-manual-review-note">Automated receipt checks are advisory only. They do not verify or reject payment; the organiser must review the receipt and make the decision manually.</p>}
             {detail.delegates.length === 0 ? <p className="admin-muted">No delegate records were found.</p> : <div className="admin-roster-table"><table><thead><tr><th>Name</th><th>Email</th><th>Institution</th><th>Preferences</th><th>Allocation</th><th>Actions</th></tr></thead><tbody>{detail.delegates.map((delegate) => <tr key={delegate._id}><td>{delegate.fullName}{delegate.isHead ? " · Head" : ""}</td><td>{delegate.email}</td><td>{detail.application.institution || "—"}</td><td>{delegate.firstPreference} / {delegate.secondPreference}</td><td>{delegate.assignedCommittee ? `${delegate.assignedCommittee} · ${delegate.assignedPortfolio || "No portfolio"}` : delegate.delegateStatus || "Unallocated"}</td><td><div className="admin-row-actions">{delegate.assignedCommittee && <button className="admin-button admin-button-small admin-button-outline" type="button" disabled={actionBusyDelegate === delegate._id} onClick={() => onRemoveAllocation(delegate._id)}>Remove allocation</button>}{delegate.delegateStatus === "Waitlisted" && <button className="admin-button admin-button-small admin-button-outline" type="button" disabled={actionBusyDelegate === delegate._id} onClick={() => onRemoveAllocation(delegate._id)}>Clear waitlist</button>}{delegate.delegateStatus !== "Waitlisted" && detail.payment?.paymentStatus === "Confirmed" && <button className="admin-button admin-button-small admin-button-warning" type="button" disabled={actionBusyDelegate === delegate._id} onClick={() => onWaitlist(delegate._id)}>Waitlist</button>}</div></td></tr>)}</tbody></table></div>}
@@ -902,6 +949,119 @@ function ReceiptAnalysisPanel({ analysis }: { analysis: ReceiptAnalysis }) {
             {analysis.textExcerpt && <details><summary>OCR text excerpt</summary><p>{analysis.textExcerpt}</p></details>}
         </section>
     );
+}
+
+function formatDateTime(value?: string): string {
+    return value ? new Date(value).toLocaleString("en-PK", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Karachi" }) : "—";
+}
+
+function ChallanHistoryPanel({ history, submittedFor }: { history: ChallanHistory; submittedFor?: string }) {
+    const isSubmitted = Boolean(submittedFor) && history.applicationId === submittedFor;
+    return (
+        <section className="admin-challan-history" aria-label={`History of challan ${history.challanNumber}`}>
+            <div className="admin-challan-history-heading">
+                <strong>Challan {history.challanNumber}</strong>
+                {history.environment === "test" && <span className="admin-risk-badge risk-medium">Test</span>}
+                {submittedFor && <span className={`admin-risk-badge ${isSubmitted ? "risk-low" : "risk-medium"}`}>{isSubmitted ? "Submitted with this application" : "Generated earlier"}</span>}
+                {history.reused && <span className="admin-risk-badge risk-high">Reused · {history.issueCount} holders</span>}
+                <span className="admin-muted">{[history.category, history.rateType, typeof history.amount === "number" ? formatMoney(history.amount) : null].filter(Boolean).join(" · ")}</span>
+            </div>
+            {history.issues.length === 0 ? <p className="admin-muted">No issue records exist for this challan (it was issued before history was recorded, or never issued).</p> : (
+                <div className="admin-roster-table"><table>
+                    <thead><tr><th>#</th><th>Held by</th><th>Institution</th><th>Reserved</th><th>Grace ends</th><th>Outcome</th><th>Application</th></tr></thead>
+                    <tbody>{history.issues.map((issue) => (
+                        <tr key={issue.issueNumber}>
+                            <td>{issue.issueNumber}</td>
+                            <td><strong>{issue.contactName}</strong><span className="admin-cell-sub">{issue.contactEmail}</span><span className="admin-cell-sub">{issue.contactWhatsapp}</span></td>
+                            <td>{issue.institution}<span className="admin-cell-sub">{issue.participantType === "solo" ? "Solo" : `Delegation of ${issue.delegateCount}`}{issue.baCode ? ` · BA ${issue.baCode}` : ""}</span></td>
+                            <td>{formatDateTime(issue.reservedAt)}</td>
+                            <td>{formatDateTime(issue.graceUntil)}</td>
+                            <td><strong>{issue.status}</strong>{issue.endedAt && <span className="admin-cell-sub">{formatDateTime(issue.endedAt)}</span>}</td>
+                            <td>{issue.applicationId ?? (issue.linkedApplicationId ? <>{issue.linkedApplicationId}<span className="admin-cell-sub">submitted a later challan</span></> : "—")}</td>
+                        </tr>
+                    ))}</tbody>
+                </table></div>
+            )}
+        </section>
+    );
+}
+
+function ChallansView({ onUnauthorized }: { onUnauthorized: () => void }) {
+    const [number, setNumber] = useState("");
+    const [history, setHistory] = useState<ChallanHistory | null>(null);
+    const [lookupError, setLookupError] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [inventory, setInventory] = useState<InventoryRow[] | null>(null);
+    const [inventoryError, setInventoryError] = useState("");
+
+    useEffect(() => {
+        let active = true;
+        void fetch("/api/admin/challans/import", { cache: "no-store" })
+            .then(async (response) => {
+                if (response.status === 401) return onUnauthorized();
+                const body = await jsonResponse<ApiResult & { inventory?: InventoryRow[] }>(response);
+                if (!active) return;
+                if (!response.ok) throw new Error(responseError(body, "Challan inventory could not be loaded."));
+                setInventory(body.inventory ?? []);
+            })
+            .catch((error: unknown) => {
+                if (active) setInventoryError(error instanceof Error ? error.message : "Challan inventory could not be loaded.");
+            });
+        return () => {
+            active = false;
+        };
+    }, [onUnauthorized]);
+
+    async function lookup(event: FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        const value = number.trim();
+        if (!value) return;
+        setBusy(true);
+        setLookupError("");
+        setHistory(null);
+        try {
+            const response = await fetch(`/api/admin/challans/${encodeURIComponent(value)}`, { cache: "no-store" });
+            if (response.status === 401) return onUnauthorized();
+            const body = await jsonResponse<ApiResult & { challan?: ChallanHistory }>(response);
+            if (!response.ok || !body.challan) throw new Error(responseError(body, "Challan history could not be loaded."));
+            setHistory(body.challan);
+        } catch (error) {
+            setLookupError(error instanceof Error ? error.message : "Challan history could not be loaded.");
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    const groups = new Map<string, { label: string; amount: number; counts: Record<string, number> }>();
+    for (const row of inventory ?? []) {
+        const key = `${row._id.environment}|${row._id.rateType}|${row._id.category}`;
+        const group = groups.get(key) ?? { label: `${row._id.environment === "test" ? "Test · " : ""}${row._id.rateType} · ${row._id.category}`, amount: row._id.amount, counts: {} };
+        group.counts[row._id.status] = (group.counts[row._id.status] ?? 0) + row.count;
+        groups.set(key, group);
+    }
+
+    return <>
+        <div className="admin-panel-heading"><div><p className="admin-eyebrow">QuickPay challans</p><h2>Challan history</h2></div><p className="admin-muted">Every time a challan is given to an applicant it is recorded here, including challans that expired or were reused.</p></div>
+        <section className="admin-panel">
+            <form className="admin-challan-lookup" onSubmit={(event) => void lookup(event)}>
+                <label className="admin-search"><span aria-hidden="true">⌕</span><input aria-label="Challan number" placeholder="Enter a challan number" value={number} maxLength={40} onChange={(event) => setNumber(event.target.value)} /></label>
+                <button className="admin-button admin-button-primary" type="submit" disabled={busy || !number.trim()}>{busy ? "Looking up…" : "Show history"}</button>
+            </form>
+            {lookupError && <p className="admin-muted" role="alert">{lookupError}</p>}
+            {history && <ChallanHistoryPanel history={history} />}
+        </section>
+        <section className="admin-panel" aria-label="Challan inventory">
+            <div className="admin-panel-heading"><div><p className="admin-eyebrow">Inventory</p><h2>Challans by category</h2></div><p className="admin-muted">Unused challans are issued first, then reusable ones (least reused, released longest ago).</p></div>
+            {inventoryError ? <p className="admin-muted" role="alert">{inventoryError}</p> : inventory === null ? <div className="admin-skeleton-list" aria-label="Loading inventory"><span /><span /></div> : groups.size === 0 ? <p className="admin-muted">No challans have been loaded yet.</p> : (
+                <div className="admin-roster-table"><table>
+                    <thead><tr><th>Category</th><th>Amount</th><th>Unused</th><th>Reusable</th><th>Held now</th><th>Submitted</th></tr></thead>
+                    <tbody>{[...groups.entries()].map(([key, group]) => (
+                        <tr key={key}><td>{group.label}</td><td>{formatMoney(group.amount)}</td><td>{group.counts.Unused ?? 0}</td><td>{group.counts.Reusable ?? 0}</td><td>{group.counts.Held ?? 0}</td><td>{group.counts.Submitted ?? 0}</td></tr>
+                    ))}</tbody>
+                </table></div>
+            )}
+        </section>
+    </>;
 }
 
 function AllocatedDelegatesTable({ delegates }: { delegates: AllocatedDelegate[] }) {

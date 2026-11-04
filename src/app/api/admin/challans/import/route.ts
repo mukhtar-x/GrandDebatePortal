@@ -4,6 +4,7 @@ import { readJsonBody } from "@/lib/requestGuards";
 import { isRecord } from "@/lib/validation";
 import Challan, { CHALLAN_CATEGORIES, type ChallanCategory } from "@/models/Challan";
 import { withTransaction } from "@/lib/transaction";
+import { calculatePricingAtRate } from "@/lib/pricing";
 
 const DELEGATE_COUNT: Record<ChallanCategory, number> = {
     solo: 1,
@@ -17,7 +18,8 @@ const DELEGATE_COUNT: Record<ChallanCategory, number> = {
 export async function POST(request: Request): Promise<Response> {
     const auth = await requireAdminMutation(request);
     if (auth.response) return auth.response;
-    const body = await readJsonBody(request);
+    // About 100 bytes per challan; 5,000 challans fit comfortably.
+    const body = await readJsonBody(request, 2 * 1024 * 1024);
     if (!isRecord(body) || !Array.isArray(body.challans) || body.challans.length < 1 || body.challans.length > 5000) {
         return Response.json({ success: false, error: "Provide between 1 and 5,000 challans." }, { status: 400 });
     }
@@ -35,9 +37,8 @@ export async function POST(request: Request): Promise<Response> {
         if (typeof category !== "string" || !CHALLAN_CATEGORIES.includes(category as ChallanCategory) || (rateType !== "Early bird" && rateType !== "Regular") || typeof amount !== "number") {
             return Response.json({ success: false, error: `Category, rate, or amount at row ${index + 1} is invalid.` }, { status: 400 });
         }
-        const count = DELEGATE_COUNT[category as ChallanCategory];
-        const perDelegate = rateType === "Early bird" ? 2000 : 2400;
-        const expectedAmount = count * perDelegate + (count > 1 ? 500 : 0);
+        const pricing = calculatePricingAtRate(DELEGATE_COUNT[category as ChallanCategory], rateType);
+        const expectedAmount = pricing.success ? pricing.pricing.totalPayable : NaN;
         if (amount !== expectedAmount) {
             return Response.json({ success: false, error: `Amount for ${challanNumber} must be PKR ${expectedAmount.toLocaleString("en-PK")} for ${rateType} ${category}.` }, { status: 400 });
         }
@@ -47,7 +48,7 @@ export async function POST(request: Request): Promise<Response> {
     try {
         await connectDB({ skipCommitteeSeed: true });
         await withTransaction(async (session) => {
-            await Challan.insertMany(rows.map((row) => ({ ...row, environment: "live", status: "Available" })), { session, ordered: true });
+            await Challan.insertMany(rows.map((row) => ({ ...row, environment: "live", status: "Available", issueCount: 0 })), { session, ordered: true });
         });
         return Response.json({ success: true, imported: rows.length }, { status: 201 });
     } catch (error) {
@@ -64,12 +65,24 @@ export async function GET(request: Request): Promise<Response> {
     if (auth.response) return auth.response;
     try {
         await connectDB({ skipCommitteeSeed: true });
-        await Challan.updateMany({ environment: { $in: ["test", "live"] }, status: { $in: ["Reserved", "Expired"] }, graceUntil: { $lte: new Date() } }, {
-            $set: { status: "Available" },
-            $unset: { reservationTokenHash: 1, registrationFingerprint: 1, reservationContactHash: 1, reservedAt: 1, expiresAt: 1, graceUntil: 1 },
-        });
+        const now = new Date();
+        // Read-only: a lapsed reservation is reported as reusable without rewriting the collection.
         const inventory = await Challan.aggregate([
-            { $group: { _id: { environment: "$environment", category: "$category", rateType: "$rateType", amount: "$amount", status: "$status" }, count: { $sum: 1 } } },
+            {
+                $set: {
+                    state: {
+                        $switch: {
+                            branches: [
+                                { case: { $eq: ["$status", "Submitted"] }, then: "Submitted" },
+                                { case: { $eq: ["$status", "Available"] }, then: "Unused" },
+                                { case: { $lte: ["$graceUntil", now] }, then: "Reusable" },
+                            ],
+                            default: "Held",
+                        },
+                    },
+                },
+            },
+            { $group: { _id: { environment: "$environment", category: "$category", rateType: "$rateType", amount: "$amount", status: "$state" }, count: { $sum: 1 } } },
             { $sort: { "_id.environment": 1, "_id.rateType": 1, "_id.category": 1, "_id.status": 1 } },
         ]);
         return Response.json({ success: true, inventory });

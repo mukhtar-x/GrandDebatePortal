@@ -710,12 +710,6 @@ textarea:focus-visible {
   gap: 13px;
 }
 
-.registration-type-grid + .button {
-  display: flex;
-  width: fit-content;
-  margin: 24px 0 0 auto;
-}
-
 .registration-type-card {
   display: flex;
   min-height: 194px;
@@ -1215,127 +1209,352 @@ textarea.form-control {
   font-weight: 700;
 }
 
-.registration-steps,
-.form-navigation {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
+/* Registration progress */
 .registration-steps {
-  margin-bottom: 16px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 16px;
   padding: 12px 14px;
   border: 1px solid rgba(229, 204, 179, 0.18);
   border-radius: 12px;
   background: rgba(13, 30, 59, 0.55);
+  list-style: none;
 }
 
-.registration-steps span {
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 10px;
+.registration-steps li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
 }
 
-.registration-steps span.is-current,
-.registration-steps span.is-complete {
+.registration-steps li:not(:last-child)::after {
+  height: 1px;
+  flex: 1 1 auto;
+  min-width: 8px;
+  background: rgba(229, 204, 179, 0.18);
+  content: "";
+}
+
+.registration-steps .step-number {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(229, 204, 179, 0.3);
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.registration-steps .step-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.registration-steps li.is-current,
+.registration-steps li.is-complete {
   color: var(--desert-sand);
   font-weight: 700;
 }
 
+.registration-steps li.is-current .step-number {
+  border-color: var(--grand-gold);
+  background: var(--grand-gold);
+  color: var(--oxford-blue);
+}
+
+.registration-steps li.is-complete .step-number {
+  border-color: rgba(201, 160, 85, 0.7);
+  color: var(--grand-gold);
+}
+
+.form-card-heading h2:focus {
+  outline: none;
+}
+
+.form-card-heading h2:focus-visible {
+  outline: 2px solid var(--grand-gold);
+  outline-offset: 4px;
+}
+
 .form-navigation {
-  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.form-navigation-end {
+  justify-content: flex-end;
+}
+
+.form-honeypot {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* Review step */
+.review-intro {
+  margin: 0 0 16px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  line-height: 1.7;
 }
 
 .review-details {
-  margin-top: 16px;
-  padding: 15px;
-  border: 1px solid rgba(229, 204, 179, 0.18);
-  border-radius: 12px;
-  color: var(--white);
+  display: grid;
+  gap: 12px;
 }
 
-.review-details h3 {
-  margin: 0 0 9px;
+.review-group {
+  padding: 14px 16px;
+  border: 1px solid rgba(229, 204, 179, 0.18);
+  border-radius: 12px;
+  background: rgba(7, 20, 43, 0.38);
+}
+
+.review-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.review-group-heading h3 {
+  margin: 0;
   color: var(--desert-sand);
   font-size: 13px;
 }
 
-.review-details p {
-  margin: 5px 0;
-  color: rgba(255, 255, 255, 0.74);
+.review-edit {
+  padding: 4px 8px;
+  border: 0;
+  background: none;
+  color: var(--grand-gold);
+  cursor: pointer;
+  font: inherit;
   font-size: 11px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
-.review-details ol {
+.review-list {
   display: grid;
-  gap: 7px;
-  margin: 10px 0 0;
-  padding-left: 22px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 18px;
+  margin: 0;
 }
 
-.review-details li {
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 11px;
+.review-list div {
+  min-width: 0;
 }
 
-.review-details li span {
-  display: block;
-  margin-top: 2px;
+.review-list .review-list-wide {
+  grid-column: 1 / -1;
+}
+
+.review-list dt {
+  color: rgba(255, 255, 255, 0.5);
   font-size: 10px;
 }
 
-@media (max-width: 640px) {
-  .registration-steps { align-items: flex-start; flex-direction: column; }
-  .form-navigation { align-items: stretch; }
+.review-list dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--white);
+  font-size: 12px;
 }
 
-.fee-table {
-  margin-top: 18px;
-  border-top: 1px solid rgba(229, 204, 179, 0.14);
+.review-notice,
+.challan-test-banner {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(232, 178, 92, 0.55);
+  border-radius: 10px;
+  background: rgba(201, 140, 40, 0.14);
+  color: #f3d7a4;
+  font-size: 11px;
+  line-height: 1.6;
 }
 
-.fee-table summary {
-  padding: 14px 0 5px;
+.challan-test-banner {
+  margin: 0 0 14px;
+}
+
+/* Payment step */
+.challan-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(201, 160, 85, 0.35);
+  border-radius: 12px;
+  background: rgba(7, 20, 43, 0.68);
+}
+
+.challan-number,
+.challan-amount {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.challan-number-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.challan-number-row strong,
+.challan-amount strong {
   color: var(--desert-sand);
-  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: clamp(18px, 3vw, 24px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.challan-copy {
+  min-height: 32px;
+  padding: 6px 12px;
+  font-size: 11px;
+}
+
+.challan-timer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(229, 204, 179, 0.22);
+  border-radius: 12px;
+  background: rgba(13, 30, 59, 0.55);
+  color: var(--white);
+}
+
+.challan-timer > div {
+  display: grid;
+  gap: 3px;
+}
+
+.challan-timer strong {
+  font-size: 12px;
+}
+
+.challan-timer > div span {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.challan-countdown {
+  color: var(--desert-sand);
+  font-family: var(--font-display);
+  font-size: clamp(22px, 4vw, 30px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.challan-timer.is-grace {
+  border-color: rgba(232, 178, 92, 0.65);
+  background: rgba(201, 140, 40, 0.16);
+}
+
+.challan-timer.is-grace .challan-countdown {
+  color: #f3c46b;
+}
+
+.challan-timer.is-expired {
+  border-color: rgba(229, 142, 126, 0.55);
+  background: rgba(150, 58, 58, 0.16);
+  color: #f1c4bb;
+}
+
+.payment-steps {
+  display: grid;
+  gap: 6px;
+  margin: 16px 0 18px;
+  padding-left: 20px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.payment-steps strong {
+  color: var(--desert-sand);
+}
+
+.field-error {
+  color: #f1a99c;
   font-size: 10px;
   font-weight: 600;
 }
 
-.fee-table-wrap {
-  overflow-x: auto;
+.lookup-error .button {
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
-.fee-table table,
+@media (max-width: 640px) {
+  .registration-steps {
+    padding: 10px;
+  }
+
+  .registration-steps li:not(.is-current) .step-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .form-navigation {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .form-navigation .button {
+    justify-content: center;
+  }
+
+  .review-list,
+  .challan-card {
+    grid-template-columns: 1fr;
+  }
+
+  .challan-timer {
+    flex-wrap: wrap;
+  }
+
+  .lookup-error {
+    flex-wrap: wrap;
+  }
+}
+
 .table-wrap table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
-}
-
-.fee-table th,
-.fee-table td {
-  padding: 9px 8px;
-  border-bottom: 1px solid rgba(229, 204, 179, 0.11);
-  color: rgba(255, 255, 255, 0.69);
-  font-size: 9px;
-  white-space: nowrap;
-}
-
-.fee-table thead th {
-  color: var(--dark-beige);
-  font-weight: 600;
-}
-
-.fee-table tbody th {
-  color: var(--white);
-  font-weight: 600;
-}
-
-.fee-table tr.is-selected th,
-.fee-table tr.is-selected td {
-  color: var(--desert-sand);
-  font-weight: 600;
 }
 
 .submit-card {

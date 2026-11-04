@@ -14,6 +14,7 @@ const COLUMNS = [
     "totalPayable",
     "rateType",
     "challanNumber",
+    "otherChallanNumbers",
     "challanEnvironment",
     "delegationFee",
     "transactionId",
@@ -80,6 +81,13 @@ export async function GET(request: Request): Promise<Response> {
                     totalPayable: "$payment.totalPayable",
                     rateType: "$payment.rateType",
                     challanNumber: "$payment.challanNumber",
+                    otherChallanNumbers: {
+                        $reduce: {
+                            input: { $ifNull: ["$payment.otherChallanNumbers", []] },
+                            initialValue: "",
+                            in: { $concat: ["$$value", { $cond: [{ $eq: ["$$value", ""] }, "", " "] }, "$$this"] },
+                        },
+                    },
                     challanEnvironment: "$payment.challanEnvironment",
                     delegationFee: "$payment.delegationFee",
                     transactionId: "$payment.transactionId",

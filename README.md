@@ -141,6 +141,7 @@ local development if exercising those workflows.
 
 | Endpoint | Purpose |
 | --- | --- |
+| `POST /api/challans/reserve` | Validate registration details and reserve a challan (`DELETE` releases it) |
 | `POST /api/register` | Validate and create a registration and store its payment receipt |
 | `POST /api/status` | Look up an application with email and application ID |
 | `POST /api/status/receipt` | Submit a replacement receipt when requested |
@@ -153,6 +154,8 @@ local development if exercising those workflows.
 | `/api/admin/committees` and `/[code]` | Create, list, edit, and remove/deactivate committees |
 | `/api/admin/delegates/[id]/allocate` and `/waitlist` | Allocate, remove, or waitlist a delegate |
 | `/api/admin/export` | Export admin data as CSV |
+| `/api/admin/challans/import` | Import live FAST challans (`POST`) and view inventory counts (`GET`) |
+| `GET /api/admin/challans/[challanNumber]` | Every recorded holder of one challan number |
 | `GET /api/admin/audit` | View the 100 most recent admin mutation audit records |
 
 Admin mutations require a valid server-side session and same-origin request checks. The admin
@@ -163,13 +166,18 @@ available at `GET /api/admin/audit`.
 
 ## Registration and payment workflow
 
-1. A solo delegate or delegation submits its details, committee preferences, and one receipt.
-2. The server validates the payload and computes the applicable fee; it stores the receipt in
-   GridFS and records the application, delegates, and payment.
-3. Organisers inspect the payment in `/admin`. They can confirm it or request a replacement
+1. A solo delegate or delegation enters its details and committee preferences, then reviews
+   them. The review step is the last chance to change anything before paying.
+2. "Generate challan" runs the same validation as registration, including the
+   already-registered check, and reserves a challan for the exact amount (see
+   [Challan inventory](#challan-inventory)).
+3. The applicant pays that challan, uploads the receipt and submits. The server checks the
+   challan still matches the details, stores the receipt in GridFS and records the application,
+   delegates and payment, including the submitted challan and any others generated earlier.
+4. Organisers inspect the payment in `/admin`. They can confirm it or request a replacement
    receipt; the applicant can check their status using their email and application ID.
-4. After confirmation, organisers allocate committees and country/portfolio assignments.
-5. Applicants see application/payment and delegate allocation states in the portal.
+5. After confirmation, organisers allocate committees and country/portfolio assignments.
+6. Applicants see application/payment and delegate allocation states in the portal.
 
 The public fee schedule in the current project is PKR 2,000 per delegate for the early-bird
 window (through 12 November 2026) and PKR 2,400 for the regular window (13–18 November 2026).
@@ -200,7 +208,24 @@ remains the decision-maker.
 ### Challan inventory
 
 Registration reserves a category- and rate-specific challan for 30 minutes, then accepts
-receipt submission during a further 15-minute grace period. Test mode idempotently creates a
+receipt submission during a further 15-minute grace period. A challan only becomes available
+to anyone else once that grace period has ended, including when the applicant changes their
+details or starts over early. Unused challans are always issued first; once none are left,
+the least reused challan whose grace period ended longest ago is issued.
+
+- Generating again with the same email and the same details (for example after a refresh)
+  returns the same challan instead of taking another one.
+- Changing the details replaces the old challan. Applicants are told not to pay the old one.
+- Every time a challan is issued, a `ChallanIssue` record stores who held it, the times, and how
+  it ended (submitted, released, replaced or expired). These records are never deleted.
+- On submit, the payment records `challanNumber` and, in `otherChallanNumbers`, any other
+  challans the applicant generated in the same form fill or with the same email in the
+  previous 3 hours.
+- The admin dashboard flags reused challans, lists earlier challans for each application, and
+  has a **Challans** tab for looking up the full history of any challan number. The full
+  receipt check flags receipts that show an earlier challan instead of the submitted one.
+
+Test mode idempotently creates a
 finite pool of `TEST-` challans and clearly warns applicants not to pay them. Switch to live
 only after FAST provides its numbered inventory. An authenticated organiser can load live
 records with `POST /api/admin/challans/import` using `{ "challans": [{ "challanNumber": "...",
@@ -295,6 +320,23 @@ Run `npm run email:smoke` locally to send two synthetic confirmation emails thro
 `npm run test:api` skips HTTP/database-backed checks when no local API/database is available.
 Some checks read or write the fixed demo records when enabled and a database is reachable.
 Keep `RUN_WRITE_TESTS` unset for routine checks and never use production data for testing.
+
+### Abuse and DDoS protection
+
+The application layer limits abuse; it cannot absorb a network-level flood on its own.
+
+- Rate limits are checked in memory on each server instance first, then in MongoDB so they
+  hold across instances. Challan reservation is limited per IP (burst and hourly), per email,
+  and to 5 challans held at once per network, so one network cannot drain the pool.
+  Registration has per-IP burst and hourly limits.
+- Request bodies are size-capped; registration uploads must declare their length.
+- A hidden honeypot field rejects simple form-filling bots.
+- Client IPs come from `X-Forwarded-For`, which Vercel overwrites with the real address.
+  Behind any other proxy, make sure it does the same.
+
+For volumetric attacks, rely on the platform: enable the Vercel Firewall and, during an
+attack, Attack Challenge Mode. A bot challenge (for example Cloudflare Turnstile) on
+"Generate challan" is the next step if scripted pool draining is seen.
 
 ## Deployment
 

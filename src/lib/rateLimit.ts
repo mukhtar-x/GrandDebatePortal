@@ -6,13 +6,51 @@ export interface RateLimitResult {
     retryAfterSeconds: number;
 }
 
+export interface RateLimitRule {
+    key: string;
+    limit: number;
+    windowMs: number;
+}
+
 function isDuplicateKeyError(error: unknown): boolean {
     return typeof error === "object" && error !== null && (error as { code?: unknown }).code === 11000;
 }
 
 /**
- * Fixed-window counter stored in MongoDB. Expired windows are removed by the TTL index.
- * Fails open: if the database is unreachable the request is allowed and the error logged.
+ * Per-instance counters checked before MongoDB. One instance seeing more than the limit means
+ * the shared count is over it too, so a flood is turned away without a database round trip.
+ */
+const MEMORY_MAX_KEYS = 20_000;
+const memoryCounters = new Map<string, { count: number; windowEnd: number }>();
+
+function consumeMemory(windowKey: string, windowEnd: number, now: number): number {
+    const entry = memoryCounters.get(windowKey);
+    if (entry) {
+        entry.count += 1;
+        return entry.count;
+    }
+    if (memoryCounters.size >= MEMORY_MAX_KEYS) {
+        for (const [key, value] of memoryCounters) {
+            if (value.windowEnd <= now) memoryCounters.delete(key);
+        }
+        // Still full of live windows: drop the oldest entries (Map keeps insertion order).
+        const excess = memoryCounters.size - MEMORY_MAX_KEYS + 1;
+        if (excess > 0) {
+            let removed = 0;
+            for (const key of memoryCounters.keys()) {
+                if (removed++ >= excess) break;
+                memoryCounters.delete(key);
+            }
+        }
+    }
+    memoryCounters.set(windowKey, { count: 1, windowEnd });
+    return 1;
+}
+
+/**
+ * Fixed-window counter: checked in memory first, then stored in MongoDB so the limit holds
+ * across instances. Expired windows are removed by the TTL index. If the database is
+ * unreachable the in-memory limit still applies and the error is logged.
  */
 export async function consumeRateLimit(
     key: string,
@@ -24,6 +62,8 @@ export async function consumeRateLimit(
     const windowEnd = windowStart + windowMs;
     const retryAfterSeconds = Math.ceil((windowEnd - now) / 1000);
     const windowKey = `${key}:${windowStart}`;
+
+    if (consumeMemory(windowKey, windowEnd, now) > limit) return { allowed: false, retryAfterSeconds };
 
     try {
         await connectDB({ skipCommitteeSeed: true });
@@ -45,14 +85,23 @@ export async function consumeRateLimit(
 
         return { allowed: (entry?.count ?? 0) <= limit, retryAfterSeconds };
     } catch (error) {
-        console.error("Rate limit check failed; allowing request:", error);
+        console.error("Rate limit check failed; using the in-memory limit only:", error);
         return { allowed: true, retryAfterSeconds: 0 };
     }
 }
 
-export function rateLimitedResponse(retryAfterSeconds: number): Response {
+/** Applies every rule in order and stops at the first one that is exceeded. */
+export async function consumeRateLimits(rules: RateLimitRule[]): Promise<RateLimitResult> {
+    for (const rule of rules) {
+        const result = await consumeRateLimit(rule.key, rule.limit, rule.windowMs);
+        if (!result.allowed) return result;
+    }
+    return { allowed: true, retryAfterSeconds: 0 };
+}
+
+export function rateLimitedResponse(retryAfterSeconds: number, error = "Too many requests. Please wait a while and try again."): Response {
     return Response.json(
-        { success: false, error: "Too many requests. Please wait a while and try again." },
+        { success: false, error, code: "RATE_LIMITED" },
         { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } },
     );
 }
