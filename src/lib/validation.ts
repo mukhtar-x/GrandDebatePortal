@@ -8,6 +8,7 @@ export const MAX_LENGTHS = {
     institution: 150,
     additionalInfo: 1000,
     transactionId: 64,
+    baCode: 50,
     reason: 500,
     portfolio: 100,
 } as const;

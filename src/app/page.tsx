@@ -97,6 +97,33 @@ export default function Home() {
             </Link>
           </div>
         </section>
+
+        <section className="brand-ambassador-callout" aria-labelledby="brand-ambassador-title">
+          <div className="brand-ambassador-copy">
+            <div className="brand-ambassador-heading">
+              <p className="section-overline">Represent The Grand Debate</p>
+              <h2 id="brand-ambassador-title">Become a Brand Ambassador</h2>
+              <p>Bring your campus community to TGD &apos;26.</p>
+            </div>
+            <div className="brand-ambassador-benefits">
+              <p className="brand-ambassador-benefits-label">Ambassador perks</p>
+              <ul className="brand-ambassador-perks">
+                <li><strong>Fee waiver</strong><span>Bring 15+ delegates or 2 delegations</span></li>
+                <li><strong>On-day hospitality</strong><span>Food and refreshments during the event</span></li>
+                <li><strong>Event keepsakes</strong><span>Exclusive merchandise and souvenirs</span></li>
+                <li><strong>Top ambassador award</strong><span>100% fee waiver, Best Brand Ambassador award, and a surprise award</span></li>
+              </ul>
+            </div>
+          </div>
+          <a
+            className="button button-primary"
+            href="https://docs.google.com/forms/d/e/1FAIpQLSfvOkzClM80pgp0WkS0WuxLZTd-niseWyoKcjuA1VxpwgGKDA/viewform"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Register as Brand Ambassador <ActionIcon direction="up-right" />
+          </a>
+        </section>
       </main>
       <SiteFooter />
     </div>

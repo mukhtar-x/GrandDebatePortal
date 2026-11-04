@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { RECEIPT_MAX_BYTES, RECEIPT_TYPES } from "@/data/event";
+import { forgetSavedApplication, readSavedApplication, saveApplication } from "@/lib/savedApplication";
 import { InputField } from "@/components/ui/form-fields";
 import { ActionIcon } from "@/components/shared/action-icon";
 import {
@@ -10,6 +12,7 @@ import {
   type DelegateRow,
   type PortalApplication,
 } from "@/lib/api/portal";
+import { quickPayPaymentId } from "@/lib/paymentDetails";
 
 const statusSteps = [
   {
@@ -70,6 +73,31 @@ export function PortalLookup() {
   const [signedIn, setSignedIn] = useState<SignedIn | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [filledFromDevice, setFilledFromDevice] = useState(false);
+
+  // Fill in the form from the latest registration on this device, or from an emailed ?id= link.
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      const saved = readSavedApplication();
+      const linkedId = new URLSearchParams(window.location.search).get("id")?.trim().toUpperCase() ?? "";
+      const id = linkedId || saved?.applicationId || "";
+      setApplicationId(id);
+      // The saved email is only used for the application it was saved with.
+      if (saved && saved.applicationId === id) {
+        setEmail(saved.email);
+        setFilledFromDevice(true);
+      }
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  function forgetDevice() {
+    forgetSavedApplication();
+    setFilledFromDevice(false);
+    setEmail("");
+    setApplicationId("");
+    clearResult();
+  }
 
   async function handleLookup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -79,6 +107,7 @@ export function PortalLookup() {
     const result = await lookupApplication(email.trim(), applicationId.trim());
     setLoading(false);
     if (result.ok) {
+      saveApplication({ applicationId: result.application.applicationId, email: email.trim().toLowerCase() });
       setSignedIn({ email: email.trim(), application: result.application });
     } else {
       setSignedIn(null);
@@ -98,7 +127,7 @@ export function PortalLookup() {
           <div className="section-heading-icon">01</div>
           <div>
             <p className="section-overline">Application lookup</p>
-            <h2>Track your application</h2>
+            <h2>Enter your details</h2>
           </div>
         </div>
         <form className="lookup-form" onSubmit={handleLookup}>
@@ -129,6 +158,14 @@ export function PortalLookup() {
             }}
             required
           />
+          {filledFromDevice ? (
+            <p className="lookup-saved-note">
+              Filled in from your last registration on this device.{" "}
+              <button className="review-edit" type="button" onClick={forgetDevice}>
+                Forget on this device
+              </button>
+            </p>
+          ) : null}
           {error ? (
             <div className="lookup-error" role="alert">
               <span aria-hidden="true">!</span>
@@ -158,18 +195,6 @@ export function PortalLookup() {
           application={signedIn.application}
           onUpdate={(application) => setSignedIn({ ...signedIn, application })}
         />
-      ) : !error ? (
-        <div className="portal-empty-state">
-          <span className="empty-state-mark" aria-hidden="true">
-            ✦
-          </span>
-          <p className="section-overline">Your progress, in one place</p>
-          <h2>Enter your details to get started.</h2>
-          <p>
-            Enter the email address used for registration and your application ID to view
-            the status of your application.
-          </p>
-        </div>
       ) : null}
     </div>
   );
@@ -189,11 +214,14 @@ function ApplicationStatusView({
     application.status === "action-required" || application.status === "waitlisted";
 
   return (
-    <section className="application-status-panel" aria-live="polite">
+    <section className="application-status-panel" aria-labelledby="application-status-heading">
+      <p className="visually-hidden" role="status">
+        Application {application.applicationId} found. Status: {statusLabels[application.status]}.
+      </p>
       <div className="application-header">
         <div>
           <p className="section-overline">Application status</p>
-          <h2>Welcome, {application.firstName}.</h2>
+          <h2 id="application-status-heading">Welcome, {application.firstName}.</h2>
         </div>
         <span className={statusClass(statusLabels[application.status])}>
           {statusLabels[application.status]}
@@ -209,12 +237,16 @@ function ApplicationStatusView({
           <strong>{application.type === "solo" ? "Solo delegate" : "Delegation"}</strong>
         </span>
       </div>
+      {application.payment?.challanNumber ? <div className="application-meta">
+        <span><small>{application.payment.test ? "Test challan" : "QuickPay ID"}</small><strong>{application.payment.test ? `${application.payment.challanNumber} · TEST — do not pay` : quickPayPaymentId(application.payment.challanNumber)}</strong></span>
+        <span><small>Amount</small><strong>{`PKR ${application.payment.totalPayable.toLocaleString("en-PK")}`}</strong></span>
+      </div> : null}
 
       {isSpecial ? (
         <SpecialStatus email={email} application={application} onUpdate={onUpdate} />
       ) : (
         <>
-          <div className="status-tracker" aria-label="Application progress">
+          <div className="status-tracker" role="list" aria-label="Application progress">
             {statusSteps.map((step, index) => {
               const isCurrent = index === currentStep;
               const isComplete = currentStep !== undefined && index < currentStep;
@@ -226,6 +258,7 @@ function ApplicationStatusView({
                     (isCurrent ? " is-current" : "")
                   }
                   key={step.key}
+                  role="listitem"
                   aria-current={isCurrent ? "step" : undefined}
                 >
                   <div className="tracker-step-marker">
@@ -339,14 +372,26 @@ function SpecialStatus({
               <input
                 className="form-control file-control"
                 type="file"
-                accept="image/*,.pdf,application/pdf"
+                accept={RECEIPT_TYPES.join(",")}
+                aria-describedby="action-upload-hint"
                 onChange={(event) => {
-                  setReceipt(event.currentTarget.files?.[0] ?? null);
-                  setUploadError(null);
+                  const file = event.currentTarget.files?.[0] ?? null;
+                  // Same limits as the server, so a file it would refuse is not uploaded first.
+                  const problem = !file
+                    ? null
+                    : !(RECEIPT_TYPES as readonly string[]).includes(file.type)
+                      ? "Upload a JPG, PNG or WebP image, or a PDF."
+                      : file.size > RECEIPT_MAX_BYTES
+                        ? `This file is larger than ${RECEIPT_MAX_BYTES / (1024 * 1024)} MB. Upload a smaller screenshot.`
+                        : null;
+                  if (problem) event.currentTarget.value = "";
+                  setReceipt(problem ? null : file);
+                  setUploadError(problem);
                 }}
               />
-              <span className="field-hint">
-                Image or PDF. The amount and date must be clearly legible.
+              <span className="field-hint" id="action-upload-hint">
+                JPG, PNG, WebP or PDF, up to {RECEIPT_MAX_BYTES / (1024 * 1024)} MB. The amount,
+                date and QuickPay ID must be clearly readable.
               </span>
             </label>
             {receipt ? (

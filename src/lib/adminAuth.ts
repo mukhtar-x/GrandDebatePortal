@@ -1,5 +1,6 @@
 import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
+import { unstable_rethrow } from "next/navigation";
 import connectDB from "@/lib/db";
 import AdminAuditLog from "@/models/AdminAuditLog";
 import AdminSession from "@/models/AdminSession";
@@ -140,6 +141,8 @@ export async function requireAdmin(
             response: Response.json({ success: false, error: "Admin sign-in required." }, { status: 401 }),
         };
     } catch (error) {
+        // Next.js signals "render this at request time" by throwing; it must not be logged as a failure.
+        unstable_rethrow(error);
         console.error("Admin session lookup failed:", error);
         return {
             session: null,

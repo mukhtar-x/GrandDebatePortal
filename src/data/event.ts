@@ -8,17 +8,26 @@ export const EVENT_DETAILS = {
   contactPhone: "0314 3552058",
 } as const;
 
+/**
+ * Delegate resources are shown as "Coming soon" until the real PDFs are ready. To publish,
+ * add the PDFs under public/docs (paths in committee-details.ts and RULEBOOK_PATH) and set
+ * the matching switch to true.
+ */
+export const STUDY_GUIDES_PUBLISHED = false;
+export const RULEBOOK_PUBLISHED = false;
+export const RULEBOOK_PATH = "/docs/event-rulebook.pdf";
+
 export const MIN_DELEGATION_SIZE = 4;
 export const MAX_DELEGATION_SIZE = 7;
 
 // Registration cutoffs use Pakistan time and are shared by pricing and the UI.
-export const EARLY_BIRD_ENDS_AT = "2026-11-08T00:00:00+05:00";
-export const REGISTRATION_ENDS_AT = "2026-11-16T00:00:00+05:00";
+export const EARLY_BIRD_ENDS_AT = "2026-11-13T00:00:00+05:00";
+export const REGISTRATION_ENDS_AT = "2026-11-19T00:00:00+05:00";
 
 export const COMMITTEES = [
   { code: "UNSC", name: "United Nations Security Council" },
   { code: "DISEC", name: "Disarmament and International Security Committee" },
-  { code: "SOCHUM", name: "Social, Humanitarian and Cultural Committee" },
+  { code: "PAC", name: "Pakistan Aurat Council" },
   {
     code: "UN Women",
     name: "United Nations Entity for Gender Equality and the Empowerment of Women",
@@ -33,29 +42,41 @@ export const EXPERIENCE_OPTIONS = [
   "Chair or Executive Board experience",
 ] as const;
 
+export const REGISTRATION_FEES = {
+  earlyBird: 2000,
+  regular: 2400,
+} as const;
+
+/** Flat fee added once to every delegation (not per delegate). */
+export const DELEGATION_FEE = 500;
+
+/** Largest payment receipt accepted, checked in the browser and again on the server. */
+export const RECEIPT_MAX_BYTES = 4 * 1024 * 1024;
+export const RECEIPT_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"] as const;
+
 const EARLY_BIRD_WINDOW = {
   key: "earlyBird",
   name: "Early bird",
-  feePerDelegate: 2000,
-  deadline: "7 November 2026",
+  feePerDelegate: REGISTRATION_FEES.earlyBird,
+  deadline: "12 November 2026",
   description:
-    "Early bird registration is open until 7 November. Delegates who register now pay PKR 2,000 instead of PKR 2,400.",
+    "Early bird registration is open until 12 November. Delegates who register now pay PKR 2,000 instead of PKR 2,400.",
 } as const;
 
 const REGULAR_WINDOW = {
   key: "regular",
   name: "Regular",
-  feePerDelegate: 2400,
-  deadline: "15 November 2026",
+  feePerDelegate: REGISTRATION_FEES.regular,
+  deadline: "18 November 2026",
   description:
-    "Early bird registration has closed. Regular registration remains open until 15 November. Delegate fee: PKR 2,400.",
+    "Early bird registration has closed. Regular registration remains open through 18 November. Delegate fee: PKR 2,400.",
 } as const;
 
 const CLOSED_WINDOW = {
   key: "closed",
   name: "Registration closed",
   feePerDelegate: 0,
-  deadline: "15 November 2026",
+  deadline: "18 November 2026",
   description:
     "Registration is now closed. Registered delegates may track their application through the portal.",
 } as const;
@@ -72,11 +93,6 @@ export function getCurrentRegistrationWindow(now = new Date()): RegistrationWind
   if (now < new Date(REGISTRATION_ENDS_AT)) return REGULAR_WINDOW;
   return CLOSED_WINDOW;
 }
-
-export const REGISTRATION_FEES = {
-  earlyBird: 2000,
-  regular: 2400,
-} as const;
 
 export function formatPKR(amount: number) {
   return "PKR " + amount.toLocaleString("en-PK");

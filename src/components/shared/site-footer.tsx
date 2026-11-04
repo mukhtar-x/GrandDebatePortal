@@ -60,7 +60,9 @@ export function SiteFooter() {
         <div className="footer-links">
           <span className="footer-kicker">Explore</span>
           <Link href="/register">Registration</Link>
+          <Link href="/committees">Committees</Link>
           <Link href="/portal">Application portal</Link>
+          <Link href="/archive">Document archive</Link>
         </div>
       </div>
       <div className="footer-bottom">

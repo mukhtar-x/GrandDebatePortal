@@ -2,6 +2,19 @@ import { MIN_DELEGATION_SIZE } from "@/data/event";
 
 export type RegistrationType = "solo" | "delegation";
 
+export function formatWhatsAppNumber(value: string) {
+  const trimmed = value.trim().replace(/\s+/g, " ");
+  const digits = trimmed.replace(/\D/g, "");
+  const pakistaniDigits = digits.startsWith("92") ? digits.slice(2) : digits;
+  const mobileDigits = pakistaniDigits.startsWith("03")
+    ? pakistaniDigits.slice(1)
+    : pakistaniDigits;
+  if (/^3\d{9}$/.test(mobileDigits)) {
+    return `+92 ${mobileDigits.slice(0, 3)} ${mobileDigits.slice(3)}`;
+  }
+  return trimmed;
+}
+
 export interface SoloFormValues {
   fullName: string;
   email: string;

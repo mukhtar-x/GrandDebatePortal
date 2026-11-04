@@ -10,10 +10,14 @@ import {
 import { usePathname } from "next/navigation";
 import { IntroFinishedContext } from "@/components/shared/site-intro-context";
 import { ActionIcon } from "@/components/shared/action-icon";
+import { INTRO_SEEN_KEY } from "@/components/shared/intro-script";
 
 const INTRO_VIDEO = "/assets/05_Videos/tgd_intro_3d_cinematic_720p_muted_for_autoplay.mp4";
 const VIDEO_POSTER = "/assets/05_Videos/video_poster_frame.jpg";
-const INTRO_SEEN_KEY = "tgd-intro-seen-v1";
+/** Undoes INTRO_PENDING_SCRIPT once the page no longer needs hiding. */
+function clearIntroPending() {
+  delete document.documentElement.dataset.intro;
+}
 
 export function SiteIntroProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -24,7 +28,10 @@ export function SiteIntroProvider({ children }: { children: ReactNode }) {
   const introActive = showIntro && !introFinished && isHomeRoute && !isAdminRoute;
 
   useEffect(() => {
-    if (!isHomeRoute || isAdminRoute) return;
+    if (!isHomeRoute || isAdminRoute) {
+      clearIntroPending();
+      return;
+    }
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const mobile = window.matchMedia("(max-width: 760px)");
@@ -32,11 +39,15 @@ export function SiteIntroProvider({ children }: { children: ReactNode }) {
       if (mobile.matches || reduceMotion.matches) {
         setIntroFinished(true);
         setShowIntro(false);
+        clearIntroPending();
         return;
       }
 
       try {
-        if (localStorage.getItem(INTRO_SEEN_KEY)) return;
+        if (localStorage.getItem(INTRO_SEEN_KEY)) {
+          clearIntroPending();
+          return;
+        }
       } catch {
         // Storage can be unavailable in private browsing; the intro remains skippable.
       }
@@ -53,6 +64,11 @@ export function SiteIntroProvider({ children }: { children: ReactNode }) {
       reduceMotion.removeEventListener("change", syncIntro);
     };
   }, [isAdminRoute, isHomeRoute]);
+
+  // Reveal the page once the intro overlay is on screen to cover it.
+  useEffect(() => {
+    if (introActive) clearIntroPending();
+  }, [introActive]);
 
   const finishIntro = useCallback(() => {
     setIntroFinished(true);

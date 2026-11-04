@@ -32,6 +32,7 @@ export interface PortalApplication {
   committeeName: string | null;
   portfolio: string | null;
   studyGuideUrl: string | null;
+  payment?: { totalPayable: number; rateType: string; status: string; challanNumber?: string; test?: boolean } | null;
   delegates?: DelegateRow[];
 }
 

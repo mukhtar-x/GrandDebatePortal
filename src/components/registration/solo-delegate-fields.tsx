@@ -1,7 +1,7 @@
 import { EXPERIENCE_OPTIONS } from "@/data/event";
 import { InputField, SelectField, TextAreaField } from "@/components/ui/form-fields";
 import { CommitteePreferences } from "@/components/registration/committee-preferences";
-import type { SoloFormValues } from "@/components/registration/types";
+import { formatWhatsAppNumber, type SoloFormValues } from "@/components/registration/types";
 
 const experienceOptions = EXPERIENCE_OPTIONS.map((experience) => ({
   value: experience,
@@ -23,6 +23,8 @@ export function SoloDelegateFields({ value, onChange }: SoloDelegateFieldsProps)
           label="Full name"
           placeholder="Name as it should appear on your name card"
           autoComplete="name"
+          autoCapitalize="words"
+          onBlur={(event) => onChange("fullName", event.currentTarget.value.trim().replace(/\s+/g, " "))}
           value={value.fullName}
           onChange={(event) => onChange("fullName", event.currentTarget.value)}
           required
@@ -34,6 +36,7 @@ export function SoloDelegateFields({ value, onChange }: SoloDelegateFieldsProps)
           label="Email address"
           placeholder="you@example.com"
           autoComplete="email"
+          onBlur={(event) => onChange("email", event.currentTarget.value.trim().toLowerCase())}
           value={value.email}
           onChange={(event) => onChange("email", event.currentTarget.value)}
           required
@@ -44,9 +47,11 @@ export function SoloDelegateFields({ value, onChange }: SoloDelegateFieldsProps)
           name="whatsapp"
           type="tel"
           label="WhatsApp number"
-          placeholder="+92 300 1234567"
+          placeholder="e.g. 0300 1234567"
           autoComplete="tel"
-          pattern="\+?[0-9\s()-]{10,18}"
+          inputMode="tel"
+          onBlur={(event) => onChange("whatsapp", formatWhatsAppNumber(event.currentTarget.value))}
+          pattern="\+?[0-9\s\x28\x29\x2d]{10,18}"
           title="Enter a valid number with country code."
           value={value.whatsapp}
           onChange={(event) => onChange("whatsapp", event.currentTarget.value)}
@@ -59,6 +64,8 @@ export function SoloDelegateFields({ value, onChange }: SoloDelegateFieldsProps)
           label="Institution"
           placeholder="School, college or university"
           autoComplete="organization"
+          autoCapitalize="words"
+          onBlur={(event) => onChange("institution", event.currentTarget.value.trim().replace(/\s+/g, " "))}
           value={value.institution}
           onChange={(event) => onChange("institution", event.currentTarget.value)}
           required

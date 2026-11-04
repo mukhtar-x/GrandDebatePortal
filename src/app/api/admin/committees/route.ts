@@ -4,6 +4,7 @@ import { DEFAULT_COMMITTEE_OPTIONS } from "@/lib/committeeDefaults";
 import { readJsonBody } from "@/lib/requestGuards";
 import { withTransaction } from "@/lib/transaction";
 import { escapeRegex, isRecord, normalizeString } from "@/lib/validation";
+import Application from "@/models/Application";
 import Committee from "@/models/Committee";
 import Delegate from "@/models/Delegate";
 import Payment from "@/models/Payment";
@@ -14,7 +15,7 @@ export async function GET(request: Request): Promise<Response> {
 
     try {
         await connectDB();
-        const [storedCommittees, allocations, unallocatedDelegates] = await Promise.all([
+        const [storedCommittees, allocations, unallocatedDelegates, allocatedDelegates] = await Promise.all([
             Committee.find().select("-_id code name agenda suitedTo level totalSeats studyGuideUrl active").sort({ code: 1 }).lean(),
             Delegate.aggregate<{ _id: string; count: number }>([
                 { $match: { assignedCommittee: { $type: "string", $ne: "" } } },
@@ -43,6 +44,38 @@ export async function GET(request: Request): Promise<Response> {
                 { $limit: 100 },
                 { $project: { fullName: 1, email: 1, applicationId: 1, firstPreference: 1, secondPreference: 1 } },
             ]),
+            Delegate.aggregate([
+                { $match: { assignedCommittee: { $type: "string", $ne: "" } } },
+                { $sort: { assignedCommittee: 1, fullName: 1 } },
+                {
+                    $lookup: {
+                        from: Application.collection.name,
+                        localField: "applicationId",
+                        foreignField: "applicationId",
+                        as: "application",
+                        pipeline: [{ $project: { baCode: 1, participantType: 1, institution: 1 } }],
+                    },
+                },
+                { $unwind: { path: "$application", preserveNullAndEmptyArrays: false } },
+                {
+                    $project: {
+                        fullName: 1,
+                        email: 1,
+                        whatsappNumber: 1,
+                        experienceLevel: 1,
+                        firstPreference: 1,
+                        secondPreference: 1,
+                        assignedCommittee: 1,
+                        assignedPortfolio: 1,
+                        delegateStatus: 1,
+                        isHead: 1,
+                        applicationId: 1,
+                        baCode: "$application.baCode",
+                        participantType: "$application.participantType",
+                        institution: "$application.institution",
+                    },
+                },
+            ]),
         ]);
         const committeeList = storedCommittees.length ? storedCommittees : DEFAULT_COMMITTEE_OPTIONS;
         const allocatedByCode = new Map(allocations.map(({ _id, count }) => [_id, count]));
@@ -60,6 +93,10 @@ export async function GET(request: Request): Promise<Response> {
                 email: delegate.email,
                 firstPreference: delegate.firstPreference,
                 secondPreference: delegate.secondPreference,
+            })),
+            allocatedDelegates: allocatedDelegates.map((delegate) => ({
+                ...delegate,
+                id: String(delegate._id),
             })),
         });
     } catch (error) {

@@ -1,38 +1,28 @@
 import type { Metadata } from "next";
 import { ActionIcon } from "@/components/shared/action-icon";
+import { ExpandableText } from "@/components/shared/expandable-text";
 import Image from "next/image";
 import { COMMITTEE_DETAILS } from "@/data/committee-details";
+import { STUDY_GUIDES_PUBLISHED } from "@/data/event";
 import { getCanonicalUrl } from "@/lib/site-url";
 
 export const metadata: Metadata = {
   title: "Committees",
   description:
-    "Explore the five committees at The Grand Debate '26 and find the debate that suits you.",
+    "Explore the five committees and their agendas at The Grand Debate '26.",
   alternates: getCanonicalUrl("/committees") ? { canonical: getCanonicalUrl("/committees") } : undefined,
   openGraph: { title: "Committees at The Grand Debate '26", description: "Explore the five Model UN committees and choose your debate at The Grand Debate '26." },
 };
 
 export default function CommitteesPage() {
   return (
-    <div className="page-container committee-page">
-      <div className="page-eyebrow">
-        <span className="eyebrow-dot" />
-        Five committees · Agendas to be announced
-      </div>
-      <header className="page-heading">
-        <p className="section-overline">Choose where to make your case</p>
+    <div className="page-container page-compact committee-page">
+      <header className="page-header registration-heading">
+        <p className="section-overline">Five committees · Agendas announced</p>
         <h1>Committees</h1>
         <p className="page-intro">
-          Each committee has its own agenda, procedure and character. Review the
-          options below, then indicate your first and second preferences on the
-          registration form.
-        </p>
-        <p className="committee-update-note">
-          Agendas are being finalised and will be announced shortly. Follow{" "}
-          <a href="https://www.instagram.com/tgd_nuces/" target="_blank" rel="noreferrer">
-            @tgd_nuces
-          </a>{" "}
-          for updates.
+          Review each committee&apos;s agenda and character, then indicate your first and
+          second preferences on the registration form.
         </p>
       </header>
 
@@ -53,30 +43,27 @@ export default function CommitteesPage() {
             <h2>{committee.name}</h2>
             <div className="committee-agenda">
               <span>Agenda</span>
-              <strong>To be announced</strong>
+              <strong>{committee.agenda}</strong>
             </div>
+            <ExpandableText className="committee-agenda-description" text={committee.agendaDescription} />
             <p className="committee-suited">
               <strong>Suited to</strong>
               {committee.suitedTo}
             </p>
-            <dl className="committee-facts">
-              <div>
-                <dt>Level</dt>
-                <dd>To be confirmed</dd>
-              </div>
-              <div>
-                <dt>Seats</dt>
-                <dd>To be confirmed</dd>
-              </div>
-            </dl>
-            <a
-              className="button button-quiet committee-guide-button"
-              href={`/docs/committees/${committee.code === "UN Women" ? "unwomen" : committee.code.toLowerCase()}-study-guide.pdf`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Study guide · PDF <ActionIcon direction="down" />
-            </a>
+            {STUDY_GUIDES_PUBLISHED && committee.studyGuideHref ? (
+              <a
+                className="button button-quiet committee-guide-button"
+                href={committee.studyGuideHref}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Study guide · PDF <ActionIcon direction="down" />
+              </a>
+            ) : (
+              <button className="button button-quiet committee-guide-button" type="button" disabled>
+                Study guide coming soon
+              </button>
+            )}
           </article>
         ))}
       </div>

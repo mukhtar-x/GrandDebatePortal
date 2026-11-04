@@ -1,3 +1,4 @@
+import { STUDY_GUIDES_PUBLISHED } from "@/data/event";
 import connectDB from "@/lib/db";
 import { firstName, isRecord, normalizeEmail, stripHtml } from "@/lib/validation";
 import Application, { type IApplication } from "@/models/Application";
@@ -47,7 +48,7 @@ type DelegateRecord = Pick<
     | "delegateStatus"
     | "isHead"
 > & { _id: unknown };
-type PaymentRecord = Pick<IPayment, "paymentStatus" | "reviewReason" | "totalPayable" | "rateType">;
+type PaymentRecord = Pick<IPayment, "paymentStatus" | "reviewReason" | "totalPayable" | "rateType" | "challanNumber" | "challanEnvironment">;
 
 export interface PortalAccess {
     application: ApplicationRecord;
@@ -95,7 +96,7 @@ export async function findPortalAccess(email: string, applicationId: string): Pr
     if (!isContact && !viewerDelegate) return null;
 
     const payment = await Payment.findOne({ applicationId })
-        .select("-_id paymentStatus reviewReason totalPayable rateType")
+        .select("-_id paymentStatus reviewReason totalPayable rateType challanNumber challanEnvironment")
         .lean<PaymentRecord>();
 
     return { application, delegates, payment, viewerDelegate, isContact };
@@ -172,9 +173,9 @@ export async function buildPortalStatus(access: PortalAccess) {
         committee: committeeCode,
         committeeName: committee?.name ?? null,
         portfolio,
-        studyGuideUrl: committee?.studyGuideUrl ?? null,
+        studyGuideUrl: STUDY_GUIDES_PUBLISHED ? committee?.studyGuideUrl ?? null : null,
         payment: isContact && payment
-            ? { totalPayable: payment.totalPayable, rateType: payment.rateType, status: payment.paymentStatus }
+            ? { totalPayable: payment.totalPayable, rateType: payment.rateType, status: payment.paymentStatus, challanNumber: payment.challanNumber, test: payment.challanEnvironment === "test" }
             : null,
         delegates: application.participantType === "delegation"
             ? visibleDelegates.map((delegate) => ({

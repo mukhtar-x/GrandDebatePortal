@@ -1,3 +1,4 @@
+import { QUICKPAY_SERVICE_CHARGE } from "@/lib/paymentDetails";
 import { isRecord } from "@/lib/validation";
 
 /**
@@ -36,7 +37,7 @@ export async function runAiCheck(input: {
     if (!key || !model) throw new Error("AI check is not configured.");
     const baseUrl = (process.env.RECEIPT_AI_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, "");
 
-    const context = `Expected amount: PKR ${input.expectedAmount}.\nOCR text (may be noisy):\n${input.ocrText.slice(0, 2000)}`;
+    const context = `Expected amount: PKR ${input.expectedAmount}, or PKR ${input.expectedAmount + QUICKPAY_SERVICE_CHARGE} including the KuickPay service charge.\nOCR text (may be noisy):\n${input.ocrText.slice(0, 2000)}`;
     const content: unknown[] = [{ type: "text", text: context }];
     if (input.image) {
         content.push({

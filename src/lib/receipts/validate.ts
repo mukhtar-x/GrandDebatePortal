@@ -1,8 +1,9 @@
 import { fileTypeFromBuffer } from "file-type";
 import sharp from "sharp";
+import { RECEIPT_MAX_BYTES } from "@/data/event";
 import { dHash, sha256Hex } from "@/lib/receipts/hash";
 
-export const MAX_RECEIPT_BYTES = 4 * 1024 * 1024;
+export const MAX_RECEIPT_BYTES = RECEIPT_MAX_BYTES;
 
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_DIMENSION = 1600;

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { COMMITTEE_DETAILS } from "@/data/committee-details";
+import { RULEBOOK_PATH, RULEBOOK_PUBLISHED, STUDY_GUIDES_PUBLISHED } from "@/data/event";
 import { ActionIcon } from "@/components/shared/action-icon";
 import { getCanonicalUrl } from "@/lib/site-url";
 
@@ -37,13 +38,9 @@ function ArchiveUpdateNote() {
 
 export default function ArchivePage() {
   return (
-    <div className="page-container archive-page">
-      <div className="page-eyebrow">
-        <span className="eyebrow-dot" />
-        Delegate resources
-      </div>
-      <header className="page-heading">
-        <p className="section-overline">Prepare for the floor</p>
+    <div className="page-container page-compact archive-page">
+      <header className="page-header registration-heading">
+        <p className="section-overline">Delegate resources</p>
         <h1>Document archive</h1>
         <p className="page-intro">
           This archive contains study guides, rules of procedure and other reference
@@ -62,17 +59,17 @@ export default function ArchivePage() {
         </div>
         <div className="archive-resource-list">
           {GENERAL_RESOURCES.map((resource, index) => {
-            const isRulebook = resource === "Rules of procedure";
+            const available = RULEBOOK_PUBLISHED && resource === "Rules of procedure";
             return (
               <div className="archive-resource" key={resource}>
                 <span className="archive-resource-number">0{index + 1}</span>
                 <span className="archive-resource-title">{resource}</span>
-                {isRulebook ? (
+                {available ? (
                   <>
                     <span className="archive-coming-soon">PDF available</span>
                     <a
                       className="button button-quiet"
-                      href="/docs/event-rulebook.pdf"
+                      href={RULEBOOK_PATH}
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -80,12 +77,7 @@ export default function ArchivePage() {
                     </a>
                   </>
                 ) : (
-                  <>
-                    <span className="archive-coming-soon">Coming soon</span>
-                    <button className="button button-quiet" type="button" disabled>
-                      Download
-                    </button>
-                  </>
+                  <span className="archive-coming-soon">Coming soon</span>
                 )}
               </div>
             );
@@ -106,7 +98,7 @@ export default function ArchivePage() {
         </div>
         <div className="archive-folder-list">
           {COMMITTEE_DETAILS.map((committee) => {
-            const guideHref = `/docs/committees/${committee.code === "UN Women" ? "unwomen" : committee.code.toLowerCase()}-study-guide.pdf`;
+            const guide = STUDY_GUIDES_PUBLISHED ? committee.studyGuideHref : null;
             return (
               <details className="archive-folder" key={committee.code}>
                 <summary>
@@ -114,21 +106,33 @@ export default function ArchivePage() {
                     <span className="archive-folder-code">{committee.code}</span>
                     {committee.name}
                   </span>
-                  <span className="archive-folder-status">Study guide available</span>
+                  <span className="archive-folder-status">
+                    {guide ? "Study guide available" : "Coming soon"}
+                  </span>
                 </summary>
                 <div className="archive-resource-list archive-folder-content">
-                  <div className="archive-resource">
-                    <span className="archive-resource-number">01</span>
-                    <span className="archive-resource-title">Study guide · PDF</span>
-                    <a
-                      className="button button-quiet"
-                      href={guideHref}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Download PDF
-                    </a>
-                  </div>
+                  {guide ? (
+                    <div className="archive-resource">
+                      <span className="archive-resource-number">01</span>
+                      <span className="archive-resource-title">Study guide · PDF</span>
+                      <a
+                        className="button button-quiet"
+                        href={guide}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Download PDF
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="archive-empty-state">
+                      <span className="archive-empty-icon" aria-hidden="true">…</span>
+                      <div>
+                        <strong>Study guide coming soon</strong>
+                        <p>The {committee.code} guide will be added here when it is published.</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </details>
             );

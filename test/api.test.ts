@@ -1,9 +1,16 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import sharp from "sharp";
 import { normalizeEmail, normalizeString, recursiveSanitize, stripHtml } from "../src/lib/validation";
 import { calculatePricing } from "../src/lib/pricing";
+import { getChallanDetails, registrationFingerprint, reusableChallanFilter, CHALLAN_ISSUE_ORDER } from "../src/lib/challans";
+import { parseRegistrationDetails } from "../src/lib/registrationInput";
+import { consumeRateLimit } from "../src/lib/rateLimit";
+import ChallanIssue, { challanIssueStatus } from "../src/models/ChallanIssue";
 import { DEFAULT_COMMITTEE_OPTIONS } from "../src/lib/committeeDefaults";
+import { COMMITTEE_DETAILS } from "../src/data/committee-details";
+import { RULEBOOK_PATH, RULEBOOK_PUBLISHED, STUDY_GUIDES_PUBLISHED } from "../src/data/event";
 import Application from "../src/models/Application";
 import Delegate from "../src/models/Delegate";
 import Payment from "../src/models/Payment";
@@ -32,15 +39,19 @@ function assertPricing(date: string, delegateCount: number, fee: number, rateTyp
 }
 
 async function main(): Promise<void> {
-await test("pricing: early-bird deadline (7 November, PKT)", () => {
-    assertPricing("2026-11-07T23:59:59.999+05:00", 1, 2000, "Early bird");
+await test("pricing: early-bird deadline (12 November, PKT)", () => {
+    assertPricing("2026-11-12T23:59:59.999+05:00", 1, 2000, "Early bird");
 });
-await test("pricing: regular starts 8 November and ends 15 November (PKT)", () => {
-    assertPricing("2026-11-08T00:00:00.000+05:00", 1, 2400, "Regular");
-    assertPricing("2026-11-15T23:59:59.999+05:00", 4, 9600, "Regular");
+await test("pricing: regular starts 13 November and ends 18 November (PKT)", () => {
+    assertPricing("2026-11-13T00:00:00.000+05:00", 1, 2400, "Regular");
+    assertPricing("2026-11-18T23:59:59.999+05:00", 4, 4 * 2400 + 500, "Regular");
 });
-await test("pricing: registration closes 16 November (PKT)", () => {
-    const result = calculatePricing(1, new Date("2026-11-16T00:00:00.000+05:00"));
+await test("pricing: delegations pay a single PKR 500 delegation fee", () => {
+    assertPricing("2026-11-05T12:00:00.000+05:00", 7, 7 * 2000 + 500, "Early bird");
+    assertPricing("2026-11-05T12:00:00.000+05:00", 1, 2000, "Early bird");
+});
+await test("pricing: registration closes 19 November (PKT)", () => {
+    const result = calculatePricing(1, new Date("2026-11-19T00:00:00.000+05:00"));
     assert.equal(result.success, false);
     if (!result.success) assert.equal(result.code, "REGISTRATION_CLOSED");
 });
@@ -68,29 +79,30 @@ await test("input normalization: strips raw HTML and script tags", () => {
     assert.equal(sanitized.delegates[0].fullName, "Delegate 1");
     assert.equal(normalizeEmail(sanitized.email), "amina.demo@example.com");
 });
-await test("study guides: placeholder PDFs exist and are valid PDF-1.4 files", () => {
-    const requiredPdfs = [
-        "public/docs/committees/unsc-study-guide.pdf",
-        "public/docs/committees/disec-study-guide.pdf",
-        "public/docs/committees/sochum-study-guide.pdf",
-        "public/docs/committees/unwomen-study-guide.pdf",
-        "public/docs/committees/pna-study-guide.pdf",
-        "public/docs/event-rulebook.pdf",
+await test("delegate resources: published PDFs are real files; unpublished ones are not shipped", () => {
+    const guides = COMMITTEE_DETAILS.flatMap(({ studyGuideHref }): string[] => (studyGuideHref ? [studyGuideHref] : []));
+    const resources = [
+        ...guides.map((href) => ({ href, published: STUDY_GUIDES_PUBLISHED })),
+        { href: RULEBOOK_PATH, published: RULEBOOK_PUBLISHED },
     ];
-    for (const relPath of requiredPdfs) {
-        const fullPath = path.join(process.cwd(), relPath);
-        assert.ok(fs.existsSync(fullPath), `Missing PDF: ${relPath}`);
-        const buf = fs.readFileSync(fullPath);
-        assert.ok(buf.length > 500, `PDF too small: ${relPath}`);
-        const header = buf.subarray(0, 8).toString("utf8");
-        assert.ok(header.startsWith("%PDF-"), `Invalid PDF header in ${relPath}: ${header}`);
+    for (const { href, published } of resources) {
+        const fullPath = path.join(process.cwd(), "public", href);
+        if (published) {
+            assert.ok(fs.existsSync(fullPath), `Published PDF is missing: ${href}`);
+            const buf = fs.readFileSync(fullPath);
+            assert.ok(buf.subarray(0, 5).toString("utf8") === "%PDF-", `Invalid PDF header in ${href}`);
+            // The old placeholders were under 1 KB; a real guide is far larger.
+            assert.ok(buf.length > 10 * 1024, `PDF looks like an empty placeholder: ${href}`);
+        } else {
+            assert.ok(!fs.existsSync(fullPath), `Unpublished PDF should not be downloadable: ${href}`);
+        }
     }
 });
 await test("committeeDefaults: references correct relative public URLs", () => {
-    const expectedUrls: Record<string, string> = {
+    const expectedUrls: Record<string, string | undefined> = {
         UNSC: "/docs/committees/unsc-study-guide.pdf",
         DISEC: "/docs/committees/disec-study-guide.pdf",
-        SOCHUM: "/docs/committees/sochum-study-guide.pdf",
+        PAC: undefined,
         "UN Women": "/docs/committees/unwomen-study-guide.pdf",
         PNA: "/docs/committees/pna-study-guide.pdf",
     };
@@ -101,6 +113,8 @@ await test("committeeDefaults: references correct relative public URLs", () => {
             `Mismatch for committee ${committee.code}`,
         );
     }
+    assert.equal(Application.schema.path("baCode")?.options.type, String);
+    assert.equal(Application.schema.path("baCode")?.options.maxlength, 50);
 });
 await test("schema indexes: compound and unique indexes are defined on models", () => {
     const delegateIndexes = Delegate.schema.indexes() as Array<[Record<string, unknown>, Record<string, unknown>]>;
@@ -128,6 +142,90 @@ await test("input validation: rejects invalid pricing/delegate counts", () => {
     }
 });
 
+const ACTIVE_CODES = new Set(DEFAULT_COMMITTEE_OPTIONS.map(({ code }) => code));
+const validSolo = () => ({
+    participantType: "solo",
+    institution: " FAST-NUCES ",
+    delegates: [{
+        fullName: " Amina Demo ",
+        email: " AMINA@EXAMPLE.COM ",
+        whatsappNumber: "+92 300 1234567",
+        experienceLevel: "None",
+        firstPreference: "unsc",
+        secondPreference: "DISEC",
+    }],
+});
+
+await test("registration details: normalises a valid solo registration", () => {
+    const result = parseRegistrationDetails(validSolo(), ACTIVE_CODES);
+    assert.equal(result.success, true);
+    if (!result.success) return;
+    assert.equal(result.value.institution, "FAST-NUCES");
+    assert.equal(result.value.contact.email, "amina@example.com");
+    assert.equal(result.value.delegates[0].firstPreference, "UNSC");
+});
+await test("registration details: rejects what registration would later refuse", () => {
+    const samePreference = validSolo();
+    samePreference.delegates[0].secondPreference = "UNSC";
+    const result = parseRegistrationDetails(samePreference, ACTIVE_CODES);
+    assert.equal(result.success, false);
+    if (!result.success) assert.equal(result.field, "delegates[0].secondPreference");
+
+    const unknownCommittee = validSolo();
+    unknownCommittee.delegates[0].firstPreference = "SOCHUM";
+    assert.equal(parseRegistrationDetails(unknownCommittee, ACTIVE_CODES).success, false);
+});
+await test("challan fingerprint: same details match, any change does not", () => {
+    const first = parseRegistrationDetails(validSolo(), ACTIVE_CODES);
+    const retyped = parseRegistrationDetails({ ...validSolo(), institution: "FAST-NUCES" }, ACTIVE_CODES);
+    const changed = parseRegistrationDetails({ ...validSolo(), institution: "Another School" }, ACTIVE_CODES);
+    assert.ok(first.success && retyped.success && changed.success);
+    if (!first.success || !retyped.success || !changed.success) return;
+    assert.equal(registrationFingerprint(first.value), registrationFingerprint(retyped.value));
+    assert.notEqual(registrationFingerprint(first.value), registrationFingerprint(changed.value));
+});
+await test("challan details: category and amount include the delegation fee", () => {
+    const solo = getChallanDetails("solo", 1, new Date("2026-11-05T12:00:00+05:00"));
+    assert.equal(solo?.category, "solo");
+    assert.equal(solo?.totalPayable, 2000);
+    const delegation = getChallanDetails("delegation", 5, new Date("2026-11-14T12:00:00+05:00"));
+    assert.equal(delegation?.category, "delegation-5");
+    assert.equal(delegation?.totalPayable, 5 * 2400 + 500);
+    assert.equal(getChallanDetails("delegation", 3), null);
+    assert.equal(getChallanDetails("solo", 1, new Date("2026-11-19T00:00:00+05:00")), null);
+});
+await test("challan reuse: unused first, grace period respected, expiry after 30 minutes", () => {
+    assert.deepEqual(Object.keys(CHALLAN_ISSUE_ORDER), ["issueCount", "graceUntil", "challanNumber"]);
+    const now = new Date("2026-11-05T12:00:00+05:00");
+    const filter = reusableChallanFilter(now);
+    assert.deepEqual(filter.$or[0], { status: "Available" });
+    assert.deepEqual(filter.$or[1], { status: { $in: ["Reserved", "Expired"] }, graceUntil: { $lte: now } });
+    assert.equal(challanIssueStatus({ status: "Active", expiresAt: new Date(now.getTime() - 1) }, now), "Expired");
+    assert.equal(challanIssueStatus({ status: "Active", expiresAt: new Date(now.getTime() + 1) }, now), "Active");
+    assert.equal(challanIssueStatus({ status: "Submitted", expiresAt: new Date(now.getTime() - 1) }, now), "Submitted");
+    const issueIndexes = ChallanIssue.schema.indexes() as Array<[Record<string, unknown>, Record<string, unknown>]>;
+    assert.ok(issueIndexes.some(([fields]) => fields.challanNumber === 1 && fields.reservedAt === 1));
+    assert.ok(Payment.schema.path("otherChallanNumbers"), "Payment must record earlier challan numbers.");
+});
+await test("rate limit: fails closed without its store; the in-memory layer still counts", async () => {
+    // This suite runs without MongoDB, so every call reaches the "store unavailable" path.
+    const key = `test-memory-${Date.now()}`;
+    const originalError = console.error;
+    console.error = () => {};
+    try {
+        const first = await consumeRateLimit(key, 2, 60_000);
+        assert.equal(first.allowed, false, "Requests must be refused when limits cannot be enforced.");
+        assert.equal(first.unavailable, true);
+        await consumeRateLimit(key, 2, 60_000);
+        const third = await consumeRateLimit(key, 2, 60_000);
+        assert.equal(third.allowed, false);
+        assert.equal(third.unavailable, undefined, "Past the limit, the in-memory layer refuses before the store is tried.");
+        assert.ok(third.retryAfterSeconds > 0);
+    } finally {
+        console.error = originalError;
+    }
+});
+
 const baseUrl = (process.env.API_BASE_URL ?? "http://localhost:3000").replace(/\/+$/, "");
 let serverAvailable = true;
 try {
@@ -150,13 +248,15 @@ if (serverAvailable) {
         assert.ok(Array.isArray(committees));
         assert.deepEqual(
             new Set(committees.map((committee: { code: string }) => committee.code)),
-            new Set(["UNSC", "DISEC", "SOCHUM", "UN Women", "PNA"]),
+            new Set(["UNSC", "DISEC", "PAC", "UN Women", "PNA"]),
         );
     });
 
     await test("Admin APIs reject unauthenticated dashboard and export requests", async () => {
         const requests: Array<{ url: string; init?: RequestInit }> = [
             { url: `${baseUrl}/api/admin/overview` },
+            { url: `${baseUrl}/api/admin/brand-ambassadors` },
+            { url: `${baseUrl}/api/admin/committees` },
             { url: `${baseUrl}/api/admin/export` },
             { url: `${baseUrl}/api/admin/receipts/check-pending`, init: { method: "POST" } },
         ];
@@ -292,6 +392,44 @@ if (serverAvailable) {
         });
     }
 
+    await test("POST /api/register rejects an overlong BA Code", async () => {
+        const form = new FormData();
+        form.set(
+            "payload",
+            JSON.stringify({
+                participantType: "solo",
+                institution: "Integration Test University",
+                baCode: "A".repeat(51),
+                delegates: [{}],
+            }),
+        );
+        const response = await fetch(`${baseUrl}/api/register`, { method: "POST", body: form });
+        assert.equal(response.status, 400);
+        const body: unknown = await response.json();
+        assert.match(JSON.stringify(body), /BA Code is invalid or too long/i);
+        assert.match(JSON.stringify(body), /"field":"baCode"/);
+    });
+
+    await test("POST /api/register requires a reserved challan", async () => {
+        const form = new FormData();
+        form.set("payload", JSON.stringify({ ...validSolo(), idempotencyKey: `api-test-${Date.now()}` }));
+        const response = await fetch(`${baseUrl}/api/register`, { method: "POST", body: form });
+        assert.equal(response.status, 400);
+        assert.match(JSON.stringify(await response.json()), /"field":"reservationToken"/);
+    });
+
+    await test("POST /api/challans/reserve validates details before issuing a challan", async () => {
+        const invalid = validSolo();
+        invalid.delegates[0].secondPreference = "UNSC";
+        const response = await fetch(`${baseUrl}/api/challans/reserve`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ registration: invalid, draftId: `api-test-${Date.now()}` }),
+        });
+        assert.equal(response.status, 400);
+        assert.match(JSON.stringify(await response.json()), /secondPreference/);
+    });
+
     await test("POST /api/status/receipt rejects missing credentials", async () => {
         const form = new FormData();
         const response = await fetch(`${baseUrl}/api/status/receipt`, { method: "POST", body: form });
@@ -304,11 +442,9 @@ if (serverAvailable) {
             throw new Error("Refusing write-enabled tests against a remote host. Set ALLOW_REMOTE_WRITE_TESTS=1 explicitly.");
         }
         const unique = Date.now().toString();
+        // A real image: the receipt validator decodes and re-encodes every upload.
         const pngBytes = Uint8Array.from(
-            Buffer.from(
-                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jY4sAAAAASUVORK5CYII=",
-                "base64",
-            ),
+            await sharp({ create: { width: 400, height: 300, channels: 3, background: "#ffffff" } }).png().toBuffer(),
         );
 
         for (const participantType of ["solo", "delegation"] as const) {
@@ -323,25 +459,48 @@ if (serverAvailable) {
                     firstPreference: "UNSC",
                     secondPreference: "DISEC",
                 }));
+                const draftId = `api-test-${unique}-${participantType}`;
+                const details = {
+                    participantType,
+                    institution: "Integration Test University",
+                    delegates: delegateEntries,
+                    headName: "Test Head",
+                    headEmail: `${baseEmail}-1@example.com`,
+                    headWhatsapp: "+923001234500",
+                    headIsDelegate: participantType === "delegation",
+                };
+                const reserve = async (registration: typeof details, previousReservationToken?: string) => {
+                    const response = await fetch(`${baseUrl}/api/challans/reserve`, {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ registration, draftId, previousReservationToken }),
+                    });
+                    return { status: response.status, body: (await response.json()) as { reservationToken?: string; challanNumber?: string; resumed?: boolean; code?: string } };
+                };
+
+                const first = await reserve({ ...details, institution: "Integration Test College" });
+                assert.equal(first.status, 200, JSON.stringify(first.body));
+                const resumed = await reserve({ ...details, institution: "Integration Test College" });
+                assert.equal(resumed.body.challanNumber, first.body.challanNumber, "Same details must resume the same challan.");
+                assert.equal(resumed.body.resumed, true);
+                const held = await reserve(details);
+                assert.equal(held.status, 409, "Different details without the previous token must not take a second challan.");
+                assert.equal(held.body.code, "CHALLAN_HELD");
+                const replaced = await reserve(details, resumed.body.reservationToken);
+                assert.equal(replaced.status, 200, JSON.stringify(replaced.body));
+                assert.notEqual(replaced.body.challanNumber, first.body.challanNumber);
+
                 const form = new FormData();
                 form.set(
                     "payload",
-                    JSON.stringify({
-                        participantType,
-                        institution: "Integration Test University",
-                        delegates: delegateEntries,
-                        headName: "Test Head",
-                        headEmail: `${baseEmail}-1@example.com`,
-                        headWhatsapp: "+923001234500",
-                        headIsDelegate: participantType === "delegation",
-                        idempotencyKey: `api-test-${unique}-${participantType}`,
-                    }),
+                    JSON.stringify({ ...details, idempotencyKey: draftId, reservationToken: replaced.body.reservationToken }),
                 );
                 form.set("receipt", new Blob([pngBytes], { type: "image/png" }), "receipt.png");
                 const response = await fetch(`${baseUrl}/api/register`, { method: "POST", body: form });
                 assert.ok(response.status === 201 || response.status === 200, `Unexpected HTTP ${response.status}`);
-                const body = (await response.json()) as { success?: boolean; applicationId?: string; firstName?: string };
+                const body = (await response.json()) as { success?: boolean; applicationId?: string; firstName?: string; challanNumber?: string };
                 assert.equal(body.success, true);
+                assert.equal(body.challanNumber, replaced.body.challanNumber);
                 assert.equal(body.firstName, participantType === "solo" ? "John" : "Test");
                 assert.equal(typeof body.applicationId, "string");
                 const statusResponse = await fetch(`${baseUrl}/api/status`, {
@@ -352,6 +511,43 @@ if (serverAvailable) {
                 assert.equal(statusResponse.status, 200);
             });
         }
+
+        await test("POST /api/challans/reserve only counts amount changes against the per-email limit", async () => {
+            // Earlier tests use up this IP's per-minute burst allowance; start in a fresh window.
+            await new Promise((resolve) => setTimeout(resolve, 61_000 - (Date.now() % 60_000)));
+            const tag = `money-${unique}`;
+            const delegation = (size: number, institution: string) => {
+                const delegates = Array.from({ length: size }, (_, index) => ({
+                    fullName: `Money ${index + 1}`,
+                    email: `${tag}-${index}@example.com`,
+                    whatsappNumber: `+9230012345${String(index).padStart(2, "0")}`,
+                    experienceLevel: "None",
+                    firstPreference: "UNSC",
+                    secondPreference: "DISEC",
+                }));
+                return { participantType: "delegation", institution, headName: "Head", headEmail: delegates[0].email, headWhatsapp: delegates[0].whatsappNumber, headIsDelegate: true, delegates };
+            };
+            let token: string | undefined;
+            const reserve = async (registration: ReturnType<typeof delegation>) => {
+                const response = await fetch(`${baseUrl}/api/challans/reserve`, {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ registration, draftId: tag, previousReservationToken: token }),
+                });
+                const body = (await response.json()) as { reservationToken?: string; code?: string };
+                if (body.reservationToken) token = body.reservationToken;
+                return { status: response.status, code: body.code };
+            };
+
+            assert.equal((await reserve(delegation(4, "Money School"))).status, 200, "first challan");
+            assert.equal((await reserve(delegation(4, "Money School A"))).status, 200, "typo fix, same amount");
+            assert.equal((await reserve(delegation(4, "Money School B"))).status, 200, "another typo fix, same amount");
+            assert.equal((await reserve(delegation(5, "Money School B"))).status, 200, "1st amount change");
+            assert.equal((await reserve(delegation(6, "Money School B"))).status, 200, "2nd amount change");
+            const third = await reserve(delegation(7, "Money School B"));
+            assert.equal(third.status, 429, "3rd amount change within 30 minutes is refused");
+            assert.equal(third.code, "RATE_LIMITED");
+        });
     } else if (process.env.RUN_WRITE_TESTS === "1") {
         skipped += 1;
         console.info("SKIP valid registration writes because MongoDB is unavailable.");

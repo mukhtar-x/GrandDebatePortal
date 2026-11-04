@@ -1,109 +1,49 @@
 import { after } from "next/server";
-import { MAX_DELEGATION_SIZE, MIN_DELEGATION_SIZE } from "@/data/event";
+import type { Types } from "mongoose";
+import { MIN_DELEGATION_SIZE } from "@/data/event";
 import { getCommitteeOptions } from "@/lib/committeeOptions";
 import connectDB from "@/lib/db";
 import { generateApplicationId } from "@/lib/idGenerator";
 import { notifyContact } from "@/lib/mailer";
-import { calculatePricing, type Pricing } from "@/lib/pricing";
-import { consumeRateLimit, rateLimitedResponse } from "@/lib/rateLimit";
+import { calculatePricingAtRate, type Pricing } from "@/lib/pricing";
+import { CHALLAN_ENVIRONMENT, challanCategory, hashSecret, recordSubmittedChallan, registrationFingerprint } from "@/lib/challans";
+import { consumeRateLimits, rateLimitedResponse } from "@/lib/rateLimit";
 import { quickCheckReceiptSafely } from "@/lib/receipts/analyze";
 import { deleteReceipt, putReceipt, receiptUrlFor } from "@/lib/receipts/store";
 import { MAX_RECEIPT_BYTES, processReceipt } from "@/lib/receipts/validate";
+import { alreadyRegisteredResponse, parseRegistrationDetails, type RegistrationDetails } from "@/lib/registrationInput";
 import { getClientIp, isHoneypotFilled, rejectCrossOrigin } from "@/lib/requestGuards";
 import { withTransaction } from "@/lib/transaction";
-import {
-    MAX_LENGTHS,
-    firstName,
-    isOneOf,
-    isRecord,
-    normalizeEmail,
-    normalizeString,
-    normalizeWhatsapp,
-    recursiveSanitize,
-} from "@/lib/validation";
+import { MAX_LENGTHS, firstName, isRecord, normalizeString, recursiveSanitize } from "@/lib/validation";
 import Application from "@/models/Application";
-import Delegate, { EXPERIENCE_LEVELS, type IDelegate } from "@/models/Delegate";
+import Delegate from "@/models/Delegate";
 import Payment from "@/models/Payment";
+import Challan from "@/models/Challan";
 
 export const maxDuration = 60;
 
-const CONTACT_LINE = "Please contact us on WhatsApp at 0314 3552058 or by email at tlc.khi@nu.edu.pk.";
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{8,100}$/;
+const RESERVATION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{40,60}$/;
+const CHALLAN_INVALID_ERROR = "This challan has expired or no longer matches your details. Generate a new challan and upload the receipt again.";
 
-interface RegistrationDelegate {
-    fullName: string;
-    email: string;
-    whatsappNumber: string;
-    experienceLevel: IDelegate["experienceLevel"];
-    additionalInfo?: string;
-    firstPreference: string;
-    secondPreference: string;
-    isHead: boolean;
-}
-
-interface RegistrationContact {
-    name: string;
-    email: string;
-    whatsapp: string;
-}
-
-interface RegistrationBody {
-    participantType: "solo" | "delegation";
-    institution: string;
-    delegates: RegistrationDelegate[];
-    contact: RegistrationContact;
-    headIsDelegate: boolean;
+interface RegistrationBody extends RegistrationDetails {
     transactionId?: string;
     idempotencyKey?: string;
+    reservationToken: string;
 }
 
 type ParseResult =
     | { success: true; value: RegistrationBody }
     | { success: false; error: string; field?: string };
 
-function canonicalCommitteeCode(value: unknown, activeCodes: Set<string>): string | undefined {
-    if (typeof value !== "string") return undefined;
-    const normalized = value.trim();
-    return [...activeCodes].find((code) => code.toLowerCase() === normalized.toLowerCase());
-}
-
-function requiredText(value: unknown, max: number): string | null {
-    const text = normalizeString(value);
-    return typeof text === "string" && text && text.length <= max ? text : null;
-}
-
 function parseRegistration(body: unknown, activeCodes: Set<string>): ParseResult {
-    if (!isRecord(body)) return { success: false, error: "Registration details are missing." };
+    const details = parseRegistrationDetails(body, activeCodes);
+    if (!details.success) return details;
+    const record = body as Record<string, unknown>;
+    const transactionId = normalizeString(record.transactionId);
+    const idempotencyKey = normalizeString(record.idempotencyKey);
+    const reservationToken = normalizeString(record.reservationToken);
 
-    const participantType = normalizeString(body.participantType);
-    const transactionId = normalizeString(body.transactionId);
-    const idempotencyKey = normalizeString(body.idempotencyKey);
-    const delegates = body.delegates;
-
-    if (participantType !== "solo" && participantType !== "delegation") {
-        return { success: false, error: "participantType must be 'solo' or 'delegation'.", field: "participantType" };
-    }
-    if (!Array.isArray(delegates)) {
-        return { success: false, error: "delegates must be an array.", field: "delegates" };
-    }
-    if (participantType === "solo" && delegates.length !== 1) {
-        return { success: false, error: "Solo registration must contain exactly one delegate.", field: "delegates" };
-    }
-    if (
-        participantType === "delegation" &&
-        (delegates.length < MIN_DELEGATION_SIZE || delegates.length > MAX_DELEGATION_SIZE)
-    ) {
-        return {
-            success: false,
-            error: `A delegation must consist of between ${MIN_DELEGATION_SIZE} and ${MAX_DELEGATION_SIZE} delegates.`,
-            field: "delegates",
-        };
-    }
-
-    const institution = requiredText(body.institution, MAX_LENGTHS.institution);
-    if (!institution) {
-        return { success: false, error: "Please complete this field.", field: "institution" };
-    }
     if (
         transactionId !== undefined &&
         transactionId !== "" &&
@@ -117,127 +57,31 @@ function parseRegistration(body: unknown, activeCodes: Set<string>): ParseResult
     ) {
         return { success: false, error: "idempotencyKey is invalid.", field: "idempotencyKey" };
     }
-
-    const normalizedDelegates: RegistrationDelegate[] = [];
-    for (const [index, entry] of delegates.entries()) {
-        const field = (name: string) => `delegates[${index}].${name}`;
-        if (!isRecord(entry)) {
-            return { success: false, error: `delegates[${index}] must be an object.`, field: `delegates[${index}]` };
-        }
-
-        const fullName = requiredText(entry.fullName, MAX_LENGTHS.name);
-        const email = normalizeEmail(entry.email);
-        const whatsappNumber = normalizeWhatsapp(entry.whatsappNumber);
-        const experienceLevel = normalizeString(entry.experienceLevel);
-        const additionalInfo = normalizeString(entry.additionalInfo);
-        const firstPreference = canonicalCommitteeCode(entry.firstPreference, activeCodes);
-        const secondPreference = canonicalCommitteeCode(entry.secondPreference, activeCodes);
-
-        if (!fullName) {
-            return { success: false, error: "Please complete this field.", field: field("fullName") };
-        }
-        if (!email) {
-            return { success: false, error: "Please enter a valid email address.", field: field("email") };
-        }
-        if (!whatsappNumber) {
-            return {
-                success: false,
-                error: "Please enter a valid WhatsApp number, including the country code.",
-                field: field("whatsappNumber"),
-            };
-        }
-        if (!isOneOf(EXPERIENCE_LEVELS, experienceLevel)) {
-            return { success: false, error: "Please complete this field.", field: field("experienceLevel") };
-        }
-        if (firstPreference === undefined) {
-            return { success: false, error: "Please complete this field.", field: field("firstPreference") };
-        }
-        if (secondPreference === undefined) {
-            return { success: false, error: "Please complete this field.", field: field("secondPreference") };
-        }
-        if (firstPreference === secondPreference) {
-            return {
-                success: false,
-                error: "Your first and second preferences must be different committees.",
-                field: field("secondPreference"),
-            };
-        }
-        if (
-            additionalInfo !== undefined &&
-            (typeof additionalInfo !== "string" || additionalInfo.length > MAX_LENGTHS.additionalInfo)
-        ) {
-            return { success: false, error: "Additional information is too long.", field: field("additionalInfo") };
-        }
-
-        normalizedDelegates.push({
-            fullName,
-            email,
-            whatsappNumber,
-            experienceLevel,
-            ...(typeof additionalInfo === "string" && additionalInfo ? { additionalInfo } : {}),
-            firstPreference,
-            secondPreference,
-            isHead: false,
-        });
-    }
-
-    const emails = normalizedDelegates.map(({ email }) => email);
-    if (new Set(emails).size !== emails.length) {
-        return {
-            success: false,
-            error: "Each delegate in the registration must have a distinct email address.",
-            field: "delegates",
-        };
-    }
-
-    let contact: RegistrationContact;
-    let headIsDelegate = false;
-    if (participantType === "solo") {
-        const [delegate] = normalizedDelegates;
-        contact = { name: delegate.fullName, email: delegate.email, whatsapp: delegate.whatsappNumber };
-    } else {
-        const headName = requiredText(body.headName, MAX_LENGTHS.name);
-        const headEmail = normalizeEmail(body.headEmail);
-        const headWhatsapp = normalizeWhatsapp(body.headWhatsapp);
-        headIsDelegate = body.headIsDelegate === true;
-
-        if (!headName) return { success: false, error: "Please complete this field.", field: "headName" };
-        if (!headEmail) {
-            return { success: false, error: "Please enter a valid email address.", field: "headEmail" };
-        }
-        if (!headWhatsapp) {
-            return {
-                success: false,
-                error: "Please enter a valid WhatsApp number, including the country code.",
-                field: "headWhatsapp",
-            };
-        }
-        if (headIsDelegate) {
-            // The head delegate's details are entered as Delegate 1.
-            if (normalizedDelegates[0].email !== headEmail) {
-                return {
-                    success: false,
-                    error: "Delegate 1 must use the head delegate's email address.",
-                    field: "delegates[0].email",
-                };
-            }
-            normalizedDelegates[0].isHead = true;
-        }
-        contact = { name: headName, email: headEmail, whatsapp: headWhatsapp };
+    if (typeof reservationToken !== "string" || !RESERVATION_TOKEN_PATTERN.test(reservationToken)) {
+        return { success: false, error: "Generate a challan for these details before submitting payment.", field: "reservationToken" };
     }
 
     return {
         success: true,
         value: {
-            participantType,
-            institution,
-            delegates: normalizedDelegates,
-            contact,
-            headIsDelegate,
+            ...details.value,
+            reservationToken,
             ...(typeof transactionId === "string" && transactionId ? { transactionId } : {}),
             ...(typeof idempotencyKey === "string" ? { idempotencyKey } : {}),
         },
     };
+}
+
+class ChallanInvalidError extends Error {}
+
+function challanInvalidResponse(): Response {
+    return Response.json({ success: false, error: CHALLAN_INVALID_ERROR, code: "CHALLAN_INVALID" }, { status: 409 });
+}
+
+/** The registration details alone, as fingerprinted when the challan was reserved. */
+function detailsOf(registration: RegistrationBody): RegistrationDetails {
+    const { participantType, institution, delegates, contact, headIsDelegate, baCode } = registration;
+    return { participantType, institution, delegates, contact, headIsDelegate, ...(baCode ? { baCode } : {}) };
 }
 
 function successResponse(
@@ -245,6 +89,8 @@ function successResponse(
     contactName: string,
     pricing: Pick<Pricing, "totalPayable" | "rateType">,
     status = 201,
+    challanNumber?: string,
+    challanEnvironment: "test" | "live" = CHALLAN_ENVIRONMENT,
 ): Response {
     return Response.json(
         {
@@ -253,6 +99,8 @@ function successResponse(
             firstName: firstName(contactName),
             totalPayable: pricing.totalPayable,
             rateType: pricing.rateType,
+            ...(challanNumber ? { challanNumber } : {}),
+            test: challanEnvironment === "test",
         },
         { status },
     );
@@ -262,15 +110,23 @@ export async function POST(request: Request): Promise<Response> {
     const crossOrigin = rejectCrossOrigin(request);
     if (crossOrigin) return crossOrigin;
 
-    const contentLength = Number(request.headers.get("content-length") ?? 0);
-    if (contentLength > MAX_RECEIPT_BYTES + 256 * 1024) {
+    // Browsers always send a length for form uploads; without one the body size is unbounded.
+    const declaredLength = request.headers.get("content-length");
+    if (!declaredLength) {
+        return Response.json({ success: false, error: "Content-Length is required." }, { status: 411 });
+    }
+    if (Number(declaredLength) > MAX_RECEIPT_BYTES + 256 * 1024) {
         return Response.json(
             { success: false, error: "The file is too large. Please upload a smaller file." },
             { status: 413 },
         );
     }
 
-    const limit = await consumeRateLimit(`register:${getClientIp(request)}`, 20, 60 * 60 * 1000);
+    const ip = getClientIp(request);
+    const limit = await consumeRateLimits([
+        { key: `register-burst:${ip}`, limit: 10, windowMs: 60 * 1000 },
+        { key: `register:${ip}`, limit: 20, windowMs: 60 * 60 * 1000 },
+    ]);
     if (!limit.allowed) return rateLimitedResponse(limit.retryAfterSeconds);
 
     let formData: FormData;
@@ -315,32 +171,23 @@ export async function POST(request: Request): Promise<Response> {
                 .lean<{ applicationId: string; contactName?: string }>();
             if (existing) {
                 const payment = await Payment.findOne({ applicationId: existing.applicationId })
-                    .select("totalPayable rateType")
-                    .lean<{ totalPayable: number; rateType: Pricing["rateType"] }>();
+                    .select("totalPayable rateType challanNumber challanEnvironment")
+                    .lean<{ totalPayable: number; rateType: Pricing["rateType"]; challanNumber?: string; challanEnvironment?: "test" | "live" }>();
                 if (payment) {
                     return successResponse(
                         existing.applicationId,
                         existing.contactName ?? registration.contact.name,
                         payment,
                         200,
+                        payment.challanNumber,
+                        payment.challanEnvironment,
                     );
                 }
             }
         }
 
-        const alreadyRegistered = await Delegate.exists({
-            email: { $in: registration.delegates.map(({ email }) => email) },
-        });
-        if (alreadyRegistered) {
-            return Response.json(
-                {
-                    success: false,
-                    error: `One or more of these email addresses is already registered. ${CONTACT_LINE}`,
-                    code: "ALREADY_REGISTERED",
-                },
-                { status: 409 },
-            );
-        }
+        const duplicate = await alreadyRegisteredResponse(registration);
+        if (duplicate) return duplicate;
     } catch (error) {
         console.error("Registration pre-checks failed:", error);
         return Response.json(
@@ -349,13 +196,33 @@ export async function POST(request: Request): Promise<Response> {
         );
     }
 
-    const pricingResult = calculatePricing(registration.delegates.length);
-    if (!pricingResult.success) {
-        const status = pricingResult.code === "REGISTRATION_CLOSED" ? 410 : 400;
-        return Response.json(
-            { success: false, error: pricingResult.error, code: pricingResult.code },
-            { status },
-        );
+    const challanTokenHash = hashSecret(registration.reservationToken);
+    const fingerprint = registrationFingerprint(detailsOf(registration));
+    const reservedChallanFilter = {
+        environment: CHALLAN_ENVIRONMENT,
+        reservationTokenHash: challanTokenHash,
+        registrationFingerprint: fingerprint,
+        status: "Reserved",
+    };
+    let pricingResult: ReturnType<typeof calculatePricingAtRate>;
+    try {
+        // Checked before the receipt is processed and stored, so a stale challan fails fast.
+        // Submission is accepted only within the 30-minute reservation, not the grace period after it.
+        const reservedChallan = await Challan.findOne({ ...reservedChallanFilter, expiresAt: { $gt: new Date() } })
+            .select("category rateType amount")
+            .lean<{ category: string; rateType: Pricing["rateType"]; amount: number }>();
+        if (!reservedChallan) return challanInvalidResponse();
+        pricingResult = calculatePricingAtRate(registration.delegates.length, reservedChallan.rateType);
+        if (
+            reservedChallan.category !== challanCategory(registration.delegates.length) ||
+            !pricingResult.success ||
+            reservedChallan.amount !== pricingResult.pricing.totalPayable
+        ) {
+            return challanInvalidResponse();
+        }
+    } catch (error) {
+        console.error("Challan validation failed:", error);
+        return Response.json({ success: false, error: "The challan could not be validated. Please try again." }, { status: 503 });
     }
 
     const receiptResult = await processReceipt(formData.get("receipt"));
@@ -385,7 +252,29 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     try {
+        let registeredChallanNumber = "";
         await withTransaction(async (session) => {
+            const now = new Date();
+            const challan = await Challan.findOneAndUpdate({
+                ...reservedChallanFilter,
+                expiresAt: { $gt: now },
+                amount: pricingResult.pricing.totalPayable,
+                rateType: pricingResult.pricing.rateType,
+            }, {
+                $set: { status: "Submitted", applicationId },
+                $unset: { reservationTokenHash: 1, registrationFingerprint: 1, reservationContactHash: 1, expiresAt: 1 },
+            }, { session, returnDocument: "after" }).lean<{ challanNumber: string; currentIssueId?: Types.ObjectId }>();
+            if (!challan) throw new ChallanInvalidError();
+            registeredChallanNumber = challan.challanNumber;
+            const otherChallanNumbers = (await recordSubmittedChallan({
+                challanIssueId: challan.currentIssueId,
+                applicationId,
+                contactEmail: registration.contact.email,
+                draftId: registration.idempotencyKey,
+                now,
+                session,
+            })).filter((number) => number !== challan.challanNumber);
+
             await Application.create(
                 [
                     {
@@ -393,6 +282,7 @@ export async function POST(request: Request): Promise<Response> {
                         participantType: registration.participantType,
                         delegateCount: registration.delegates.length,
                         institution: registration.institution,
+                        ...(registration.baCode ? { baCode: registration.baCode } : {}),
                         contactName: registration.contact.name,
                         contactEmail: registration.contact.email,
                         contactWhatsapp: registration.contact.whatsapp,
@@ -427,6 +317,10 @@ export async function POST(request: Request): Promise<Response> {
                         applicationId,
                         totalPayable: pricingResult.pricing.totalPayable,
                         rateType: pricingResult.pricing.rateType,
+                        challanNumber: challan.challanNumber,
+                        ...(otherChallanNumbers.length ? { otherChallanNumbers } : {}),
+                        challanEnvironment: CHALLAN_ENVIRONMENT,
+                        delegationFee: pricingResult.pricing.delegationFee,
                         receiptUrl: receiptUrlFor(receiptFileId),
                         receiptFileId,
                         receiptMime: receipt.mime,
@@ -449,11 +343,15 @@ export async function POST(request: Request): Promise<Response> {
                 rateType: pricingResult.pricing.rateType,
                 participantType: registration.participantType,
                 delegateCount: registration.delegates.length,
+                challanNumber: registeredChallanNumber,
+                delegationFee: pricingResult.pricing.delegationFee,
+                challanEnvironment: CHALLAN_ENVIRONMENT,
             }),
         );
-        return successResponse(applicationId, registration.contact.name, pricingResult.pricing);
+        return successResponse(applicationId, registration.contact.name, pricingResult.pricing, 201, registeredChallanNumber, CHALLAN_ENVIRONMENT);
     } catch (error) {
         await deleteReceipt(receiptFileId);
+        if (error instanceof ChallanInvalidError) return challanInvalidResponse();
         if (isRecord(error) && error.code === 11000) {
             return Response.json(
                 { success: false, error: "A registration with conflicting unique data already exists." },

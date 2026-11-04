@@ -3,6 +3,7 @@ import connectDB from "@/lib/db";
 import { countPendingFullChecks } from "@/lib/receipts/analyze";
 import { escapeRegex, isOneOf } from "@/lib/validation";
 import Application, { APPLICATION_STATUSES, PARTICIPANT_TYPES } from "@/models/Application";
+import Challan from "@/models/Challan";
 import Delegate from "@/models/Delegate";
 import Payment from "@/models/Payment";
 
@@ -12,7 +13,7 @@ const RISK_LEVELS = ["low", "medium", "high"] as const;
 
 /**
  * Query: status, type, paymentStatus, risk (low|medium|high), q (searches ID, contact,
- * institution), sort=risk (riskiest receipts first; default newest first), page (1-based).
+ * institution, BA code, challan numbers), sort=risk (riskiest receipts first; default newest first), page (1-based).
  * `pendingChecks` is how many receipts still need a full (OCR) check.
  */
 export async function GET(request: Request): Promise<Response> {
@@ -35,15 +36,18 @@ export async function GET(request: Request): Promise<Response> {
         await connectDB();
         if (q) {
             const pattern = { $regex: escapeRegex(q), $options: "i" };
-            const delegateApplications = await Delegate.distinct("applicationId", {
-                $or: [{ email: pattern }, { fullName: pattern }],
-            });
+            const [delegateApplications, challanApplications] = await Promise.all([
+                Delegate.distinct("applicationId", { $or: [{ email: pattern }, { fullName: pattern }] }),
+                Payment.distinct("applicationId", { $or: [{ challanNumber: pattern }, { otherChallanNumbers: pattern }] }),
+            ]);
             match.$or = [
                 { applicationId: pattern },
                 { contactEmail: pattern },
                 { contactName: pattern },
                 { institution: pattern },
+                { baCode: pattern },
                 ...(delegateApplications.length ? [{ applicationId: { $in: delegateApplications } }] : []),
+                ...(challanApplications.length ? [{ applicationId: { $in: challanApplications } }] : []),
             ];
         }
         const [result] = await Application.aggregate<{ items: unknown[]; total: { count: number }[] }>([
@@ -61,6 +65,10 @@ export async function GET(request: Request): Promise<Response> {
                                 _id: 0,
                                 paymentStatus: 1,
                                 totalPayable: 1,
+                                delegationFee: 1,
+                                challanNumber: 1,
+                                otherChallanNumbers: 1,
+                                challanEnvironment: 1,
                                 rateType: 1,
                                 transactionId: 1,
                                 receiptFileId: 1,
@@ -77,6 +85,18 @@ export async function GET(request: Request): Promise<Response> {
                 },
             },
             { $unwind: { path: "$payment", preserveNullAndEmptyArrays: true } },
+            {
+                // How many times the submitted challan was issued; more than once means it was reused.
+                $lookup: {
+                    from: Challan.collection.name,
+                    localField: "payment.challanNumber",
+                    foreignField: "challanNumber",
+                    as: "challan",
+                    pipeline: [{ $project: { _id: 0, issueCount: 1 } }],
+                },
+            },
+            { $set: { "payment.challanIssueCount": { $first: "$challan.issueCount" } } },
+            { $unset: "challan" },
             ...(isOneOf(PAYMENT_STATUSES, paymentStatus)
                 ? [{ $match: { "payment.paymentStatus": paymentStatus } }]
                 : []),
