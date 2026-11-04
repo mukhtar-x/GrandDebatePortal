@@ -1,3 +1,4 @@
+import { STUDY_GUIDES_PUBLISHED } from "@/data/event";
 import connectDB from "@/lib/db";
 import { firstName, isRecord, normalizeEmail, stripHtml } from "@/lib/validation";
 import Application, { type IApplication } from "@/models/Application";
@@ -172,7 +173,7 @@ export async function buildPortalStatus(access: PortalAccess) {
         committee: committeeCode,
         committeeName: committee?.name ?? null,
         portfolio,
-        studyGuideUrl: committee?.studyGuideUrl ?? null,
+        studyGuideUrl: STUDY_GUIDES_PUBLISHED ? committee?.studyGuideUrl ?? null : null,
         payment: isContact && payment
             ? { totalPayable: payment.totalPayable, rateType: payment.rateType, status: payment.paymentStatus, challanNumber: payment.challanNumber, test: payment.challanEnvironment === "test" }
             : null,

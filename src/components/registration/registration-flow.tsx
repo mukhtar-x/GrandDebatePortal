@@ -36,6 +36,7 @@ import {
   type RegistrationSuccess,
 } from "@/lib/api/registration";
 import { quickPayPaymentId } from "@/lib/paymentDetails";
+import { saveApplication } from "@/lib/savedApplication";
 import { QUICKPAY_SERVICE_CHARGE } from "@/lib/paymentDetails";
 
 const STEPS = ["Type", "Details", "Review", "Payment"] as const;
@@ -98,6 +99,43 @@ function useNow(active: boolean) {
   return now;
 }
 
+const DELEGATE_FIELD_IDS: Record<string, string> = {
+  fullName: "name",
+  email: "email",
+  whatsappNumber: "whatsapp",
+  experienceLevel: "experience",
+  firstPreference: "first-preference",
+  secondPreference: "second-preference",
+};
+
+const SOLO_FIELD_IDS: Record<string, string> = {
+  fullName: "solo-full-name",
+  email: "solo-email",
+  whatsappNumber: "solo-whatsapp",
+  experienceLevel: "solo-experience",
+  additionalInfo: "solo-additional-information",
+  firstPreference: "solo-first-preference",
+  secondPreference: "solo-second-preference",
+};
+
+/** Maps an API field path such as "delegates[2].email" to the form input that holds it. */
+function fieldElementId(field: string, type: RegistrationType): string | null {
+  const match = field.match(/^delegates\[(\d+)\]\.(\w+)$/);
+  if (match) {
+    if (type === "solo") return SOLO_FIELD_IDS[match[2]] ?? null;
+    const suffix = DELEGATE_FIELD_IDS[match[2]];
+    return suffix ? `delegate-${match[1]}-${suffix}` : null;
+  }
+  const topLevel: Record<string, string> = {
+    institution: type === "solo" ? "solo-institution" : "delegation-institution",
+    headName: "head-name",
+    headEmail: "head-email",
+    headWhatsapp: "head-whatsapp",
+    baCode: "registration-ba-code",
+  };
+  return topLevel[field] ?? null;
+}
+
 function committeeLabel(code: string) {
   const committee = COMMITTEES.find((item) => item.code === code);
   return committee ? `${committee.code} · ${committee.name}` : code || "Not chosen";
@@ -138,7 +176,7 @@ function FeeSummary({
       {delegateCount > 1 ? <div className="summary-line"><span>Delegation fee</span><strong>{formatPKR(DELEGATION_FEE)}</strong></div> : null}
       <div className="summary-line">
         <span>Registration fee</span>
-        <strong aria-live="polite" aria-atomic="true">{formatPKR(total)}</strong>
+        <strong>{formatPKR(total)}</strong>
       </div>
       <div className="summary-line">
         <span>KuickPay service charge</span>
@@ -175,7 +213,7 @@ function ReviewDetails({
       <section className="review-group">
         <div className="review-group-heading">
           <h3>Registration</h3>
-          <button className="review-edit" type="button" onClick={() => onEdit("registration-ba-code")}>Edit</button>
+          <button className="review-edit" type="button" aria-label="Edit registration details" onClick={() => onEdit(registrationType === "solo" ? "solo-institution" : "delegation-institution")}>Edit</button>
         </div>
         <dl className="review-list">
           <div><dt>Type</dt><dd>{registrationType === "solo" ? "Solo delegate" : `Delegation of ${delegation.size}`}</dd></div>
@@ -188,7 +226,7 @@ function ReviewDetails({
         <section className="review-group">
           <div className="review-group-heading">
             <h3>Head delegate</h3>
-            <button className="review-edit" type="button" onClick={() => onEdit("head-name")}>Edit</button>
+            <button className="review-edit" type="button" aria-label="Edit head delegate" onClick={() => onEdit("head-name")}>Edit</button>
           </div>
           <dl className="review-list">
             <div><dt>Name</dt><dd>{delegation.headName}</dd></div>
@@ -203,7 +241,14 @@ function ReviewDetails({
         <section className="review-group" key={index}>
           <div className="review-group-heading">
             <h3>{registrationType === "solo" ? "Your details" : `Delegate ${index + 1}`}</h3>
-            <button className="review-edit" type="button" onClick={() => onEdit(registrationType === "solo" ? "solo-full-name" : `delegate-${index}-name`)}>Edit</button>
+            <button
+              className="review-edit"
+              type="button"
+              aria-label={registrationType === "solo" ? "Edit your details" : `Edit delegate ${index + 1}`}
+              onClick={() => onEdit(registrationType === "solo" ? "solo-full-name" : `delegate-${index}-name`)}
+            >
+              Edit
+            </button>
           </div>
           <dl className="review-list">
             <div><dt>Name</dt><dd>{delegate.fullName}</dd></div>
@@ -234,6 +279,7 @@ export function RegistrationFlow() {
   const [receipt, setReceipt] = useState<File | null>(null);
   const [transactionId, setTransactionId] = useState("");
   const [confirmation, setConfirmation] = useState<RegistrationSuccess | null>(null);
+  const [copiedApplicationId, setCopiedApplicationId] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [challanInvalid, setChallanInvalid] = useState(false);
@@ -249,6 +295,10 @@ export function RegistrationFlow() {
   const formRef = useRef<HTMLFormElement>(null);
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
   const previousStep = useRef(step);
+  /** Field to focus after the next step change (set by Edit and "Fix this"). */
+  const pendingFocusId = useRef<string | null>(null);
+  /** Form field id for the server error shown at step 3, so it can be fixed in one click. */
+  const [flowErrorFieldId, setFlowErrorFieldId] = useState<string | null>(null);
   // One key per form fill: links every challan generated for it and makes submit retries safe.
   const draftId = useRef<string | null>(null);
 
@@ -304,10 +354,18 @@ export function RegistrationFlow() {
     }
   }, [hydrated, confirmation, step, registrationType, solo, delegation, baCode, reservation, reservedKey]);
 
-  // Moving between steps brings the new step into view and moves focus to its heading.
+  // Moving between steps brings the new step into view and moves focus to its heading, or to
+  // the field the applicant asked to edit.
   useEffect(() => {
     if (previousStep.current === step) return;
     previousStep.current = step;
+    const target = pendingFocusId.current ? document.getElementById(pendingFocusId.current) : null;
+    pendingFocusId.current = null;
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      target.focus({ preventScroll: true });
+      return;
+    }
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     stepHeadingRef.current?.focus({ preventScroll: true });
   }, [step]);
@@ -316,17 +374,14 @@ export function RegistrationFlow() {
     setStep(next);
     setStepEnteredAt(Date.now());
     setFlowError(null);
+    setFlowErrorFieldId(null);
     setSubmitError(null);
     setChallanInvalid(false);
   }
 
   function editReviewField(targetId: string, targetStep = 2) {
+    pendingFocusId.current = targetId;
     goToStep(targetStep);
-    window.setTimeout(() => {
-      const target = document.getElementById(targetId);
-      target?.focus();
-      target?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 80);
   }
 
   function handleSoloChange(field: keyof SoloFormValues, value: string) {
@@ -437,6 +492,7 @@ export function RegistrationFlow() {
     }
     setReserving(true);
     setFlowError(null);
+    setFlowErrorFieldId(null);
     setSubmitError(null);
     setChallanInvalid(false);
     draftId.current ??= newIdempotencyKey();
@@ -449,6 +505,7 @@ export function RegistrationFlow() {
     setReserving(false);
     if (!result.ok) {
       setFlowError(result.field ? describeField(result.field, registrationType) + ": " + result.error : result.error);
+      setFlowErrorFieldId(result.field ? fieldElementId(result.field, registrationType) : null);
       return;
     }
     if (result.data.challanNumber !== reservation?.challanNumber) setReceipt(null);
@@ -485,6 +542,10 @@ export function RegistrationFlow() {
 
     if (result.ok) {
       clearStoredDraft();
+      saveApplication({
+        applicationId: result.data.applicationId,
+        email: (registrationType === "solo" ? solo.email : delegation.headEmail).trim().toLowerCase(),
+      });
       setConfirmation(result.data);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
@@ -494,6 +555,16 @@ export function RegistrationFlow() {
           ? describeField(result.field, registrationType) + ": " + result.error
           : result.error,
       );
+    }
+  }
+
+  async function copyApplicationId(applicationId: string) {
+    try {
+      await navigator.clipboard.writeText(applicationId);
+      setCopiedApplicationId(true);
+      window.setTimeout(() => setCopiedApplicationId(false), 2000);
+    } catch {
+      // Clipboard access can be blocked; the ID stays visible and selectable.
     }
   }
 
@@ -533,14 +604,19 @@ export function RegistrationFlow() {
         </p>
         <div className="application-id-box">
           <span>Your application ID</span>
-          <strong>{confirmation.applicationId}</strong>
+          <div className="application-id-row">
+            <strong>{confirmation.applicationId}</strong>
+            <button className="button button-quiet challan-copy" type="button" onClick={() => void copyApplicationId(confirmation.applicationId)}>
+              {copiedApplicationId ? "Copied" : "Copy ID"}
+            </button>
+          </div>
           <small>
-            Please retain it, as it is required to sign in to the portal with the email
-            address used on the form.
+            Keep it safe: you need it, with the email address used on the form, to sign in to
+            the portal. We&apos;ve also saved it on this device, so the portal fills it in for you.
           </small>
         </div>
         <div className="confirmation-actions">
-          <Link className="button button-primary" href="/portal">
+          <Link className="button button-primary" href={`/portal?id=${encodeURIComponent(confirmation.applicationId)}`}>
             Go to Portal <ActionIcon />
           </Link>
           <button className="button button-quiet" type="button" onClick={startNewRegistration}>
@@ -693,7 +769,7 @@ export function RegistrationFlow() {
               autoCapitalize="characters"
               placeholder="Enter your BA Code, if you have one"
               autoComplete="off"
-              hint="Optional. Enter the code provided by your Brand Ambassador."
+              hint="The code given to you by your Brand Ambassador, if you have one."
             />
           </div>
           <div className="form-navigation">
@@ -727,7 +803,17 @@ export function RegistrationFlow() {
               <span>Do not pay that challan. A new challan will replace it when you continue.</span>
             </div>
           ) : null}
-          {flowError ? <div className="lookup-error" role="alert"><span aria-hidden="true">!</span><p>{flowError}</p></div> : null}
+          {flowError ? (
+            <div className="lookup-error" role="alert">
+              <span aria-hidden="true">!</span>
+              <p>{flowError}</p>
+              {flowErrorFieldId ? (
+                <button className="button button-quiet" type="button" onClick={() => editReviewField(flowErrorFieldId)}>
+                  Fix this
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           <div className="form-navigation">
             <button className="button button-quiet" type="button" onClick={() => goToStep(2)}>Edit details</button>
             <button className="button button-primary" type="button" onClick={() => void continueToPayment()} disabled={reserving} aria-busy={reserving}>
@@ -742,15 +828,6 @@ export function RegistrationFlow() {
             </button>
           </div>
         </section> : null}
-
-        {step >= 3 ? <div className="registration-mobile-summary">
-          <FeeSummary
-            registrationType={registrationType}
-            delegateCount={delegateCount}
-            registrationWindow={registrationWindow}
-            total={reservationMatches && reservation ? reservation.amount : total}
-          />
-        </div> : null}
 
         {step === 4 ? <PaymentSection
           delegateCount={delegateCount}
@@ -804,6 +881,16 @@ export function RegistrationFlow() {
             your status will be updated in the portal.
           </p>
         </section> : null}
+
+        {/* On phones the summary follows the step, so the QuickPay ID and timer come first. */}
+        {step >= 3 ? <div className="registration-mobile-summary">
+          <FeeSummary
+            registrationType={registrationType}
+            delegateCount={delegateCount}
+            registrationWindow={registrationWindow}
+            total={reservationMatches && reservation ? reservation.amount : total}
+          />
+        </div> : null}
       </form>
 
       <aside className="registration-sidebar">

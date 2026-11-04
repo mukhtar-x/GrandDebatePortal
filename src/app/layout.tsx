@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Cinzel, Montserrat } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { INTRO_PENDING_SCRIPT } from "@/components/shared/intro-script";
 import { SiteIntroProvider } from "@/components/shared/site-intro";
 import { getPublicSiteUrl } from "@/lib/site-url";
 import "./globals.css";
@@ -82,8 +83,10 @@ export default function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="en" className={cinzel.variable + " " + montserrat.variable}>
+    // The intro script may set data-intro before React hydrates.
+    <html lang="en" className={cinzel.variable + " " + montserrat.variable} suppressHydrationWarning>
       <body>
+        <script dangerouslySetInnerHTML={{ __html: INTRO_PENDING_SCRIPT }} />
         <SiteIntroProvider>{children}</SiteIntroProvider>
         <Analytics />
         <SpeedInsights />

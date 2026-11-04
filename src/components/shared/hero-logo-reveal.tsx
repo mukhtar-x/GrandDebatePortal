@@ -40,7 +40,8 @@ export function HeroLogoReveal() {
       autoPlay={shouldAnimate}
       muted
       playsInline
-      preload="auto"
+      // The poster covers the still state; only download the video when it will play.
+      preload={shouldAnimate ? "auto" : "none"}
       poster="/assets/05_Videos/tgd_logo_reveal_final_frame.png"
       onCanPlay={() => {
         if (shouldAnimate && videoRef.current) {

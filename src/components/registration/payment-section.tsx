@@ -103,7 +103,7 @@ export function PaymentSection({
             <div className="challan-number">
               <span className="payment-label">{reservation.test ? "Test challan" : "QuickPay ID"}</span>
               <div className="challan-number-row">
-                <strong aria-label={reservation.test ? reservation.challanNumber : quickPayPaymentId(reservation.challanNumber)}>
+                <strong>
                   {reservation.test ? (
                     reservation.challanNumber
                   ) : (
@@ -117,11 +117,12 @@ export function PaymentSection({
               {!reservation.test ? <span className="payment-rate">Enter this ID in your bank app’s Bill Payment / KuickPay field.</span> : null}
             </div>
             <div className="challan-amount">
-              <span className="payment-label">Pay exactly</span>
-              <strong>{formatPKR(reservation.amount)}</strong>
+              <span className="payment-label">{reservation.test ? "Registration fee" : "You pay"}</span>
+              <strong>{formatPKR(reservation.test ? reservation.amount : reservation.amount + QUICKPAY_SERVICE_CHARGE)}</strong>
               <span className="payment-rate">
-                {delegateCount} × {formatPKR(perDelegate)} ({reservation.rateType} rate)
+                {delegateCount} × {formatPKR(perDelegate)} ({reservation.rateType})
                 {delegationFee ? ` + ${formatPKR(delegationFee)} delegation fee` : ""}
+                {reservation.test ? "" : ` + ${formatPKR(QUICKPAY_SERVICE_CHARGE)} KuickPay charge`}
               </span>
             </div>
           </div>
@@ -160,16 +161,15 @@ export function PaymentSection({
             ) : (
               <li>In your bank app, select Bill Payment / KuickPay and enter QuickPay ID <strong>{quickPayPaymentId(reservation.challanNumber)}</strong>.</li>
             )}
-            <li>Pay exactly <strong>{formatPKR(reservation.amount)}</strong>. Keep the QuickPay ID visible on the receipt.</li>
-            <li>Upload the payment screenshot or receipt and submit before the timer ends.</li>
+            {reservation.test ? null : (
+              <li>
+                Check the bill shows <strong>{formatPKR(reservation.amount)}</strong>. Your bank adds the{" "}
+                {formatPKR(QUICKPAY_SERVICE_CHARGE)} KuickPay charge, so you pay{" "}
+                <strong>{formatPKR(reservation.amount + QUICKPAY_SERVICE_CHARGE)}</strong>.
+              </li>
+            )}
+            <li>Take a screenshot of the receipt with the amount, date and QuickPay ID visible, then upload it below and submit before the timer ends.</li>
           </ol>
-          {!reservation.test ? (
-            <div className="payment-fee-note" aria-label="Payment total including KuickPay service charge">
-              <span>Registration fee <strong>{formatPKR(reservation.amount)}</strong></span>
-              <span>KuickPay service charge <strong>{formatPKR(QUICKPAY_SERVICE_CHARGE)}</strong></span>
-              <span className="payment-fee-total">Total at payment <strong>{formatPKR(reservation.amount + QUICKPAY_SERVICE_CHARGE)}</strong></span>
-            </div>
-          ) : null}
         </>
       ) : (
         <div className="payment-instructions">
@@ -210,7 +210,7 @@ export function PaymentSection({
           id="transaction-id"
           name="transactionId"
           label="Transaction ID"
-          placeholder="Optional"
+          placeholder="As shown on your receipt"
           maxLength={MAX_TRANSACTION_ID_LENGTH}
           value={transactionId}
           onChange={(event) => onTransactionIdChange(event.currentTarget.value)}

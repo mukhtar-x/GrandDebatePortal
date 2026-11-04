@@ -229,6 +229,8 @@ export default function AdminDashboard() {
     const [allocatedQuery, setAllocatedQuery] = useState("");
     const [allocatedCommittee, setAllocatedCommittee] = useState("");
     const [query, setQuery] = useState("");
+    /** The search actually sent to the server, updated once typing pauses. */
+    const [searchQuery, setSearchQuery] = useState("");
     const [stage, setStage] = useState("");
     const [participantType, setParticipantType] = useState("");
     const [paymentStatus, setPaymentStatus] = useState("");
@@ -260,7 +262,7 @@ export default function AdminDashboard() {
         setLoading(true);
         setError("");
         const params = new URLSearchParams({ page: String(page) });
-        if (query.trim()) params.set("q", query.trim());
+        if (searchQuery.trim()) params.set("q", searchQuery.trim());
         if (stage) params.set("status", stage);
         if (participantType) params.set("type", participantType);
         if (paymentStatus) params.set("paymentStatus", paymentStatus);
@@ -328,7 +330,13 @@ export default function AdminDashboard() {
         } finally {
             if (requestId === dashboardRequestId.current) setLoading(false);
         }
-    }, [page, participantType, paymentStatus, query, risk, sort, stage]);
+    }, [page, participantType, paymentStatus, searchQuery, risk, sort, stage]);
+
+    // Each search reloads four endpoints, so wait until typing pauses.
+    useEffect(() => {
+        const timer = window.setTimeout(() => setSearchQuery(query), 300);
+        return () => window.clearTimeout(timer);
+    }, [query]);
 
     useEffect(() => {
         let active = true;

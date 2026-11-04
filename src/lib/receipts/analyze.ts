@@ -1,5 +1,5 @@
 import connectDB from "@/lib/db";
-import { PAYMENT_DETAILS } from "@/lib/paymentDetails";
+import { PAYMENT_DETAILS, QUICKPAY_SERVICE_CHARGE } from "@/lib/paymentDetails";
 import { isAiCheckConfigured, runAiCheck, type AiCheckResult } from "@/lib/receipts/aiCheck";
 import { hammingDistance } from "@/lib/receipts/hash";
 import { extractReceiptText } from "@/lib/receipts/ocr";
@@ -72,6 +72,11 @@ function duplicateFlags(
         .map(([code, ids]) => ({ code, severity: "high" as const, detail: DUPLICATE_DETAILS[code](ids.join(", ")) }));
 }
 
+/** KuickPay receipts show the fee plus its service charge, so either total is correct. */
+function acceptedAmounts(payment: Pick<IPayment, "totalPayable">): number[] {
+    return [payment.totalPayable, payment.totalPayable + QUICKPAY_SERVICE_CHARGE];
+}
+
 const compact = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
 /** Compares challan numbers printed on the receipt with the one the registration was submitted with. */
@@ -102,11 +107,11 @@ function contentFlags(payment: IPayment, parsed: ParsedReceipt, text: string): I
         flags.push({ code: "UNREADABLE", severity: "medium", detail: "No usable text could be read from the receipt." });
     } else if (parsed.amount === null) {
         flags.push({ code: "AMOUNT_NOT_FOUND", severity: "low", detail: "No payment amount could be read." });
-    } else if (!parsed.amountCandidates.includes(payment.totalPayable)) {
+    } else if (!acceptedAmounts(payment).some((amount) => parsed.amountCandidates.includes(amount))) {
         flags.push({
             code: "AMOUNT_MISMATCH",
             severity: "high",
-            detail: `Receipt shows PKR ${parsed.amount.toLocaleString("en-US")}; expected PKR ${payment.totalPayable.toLocaleString("en-US")}.`,
+            detail: `Receipt shows PKR ${parsed.amount.toLocaleString("en-US")}; expected PKR ${payment.totalPayable.toLocaleString("en-US")} (PKR ${(payment.totalPayable + QUICKPAY_SERVICE_CHARGE).toLocaleString("en-US")} with the KuickPay charge).`,
         });
     }
 

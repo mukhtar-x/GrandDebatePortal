@@ -215,15 +215,18 @@ export function parseRegistrationDetails(body: unknown, activeCodes: Set<string>
 
 /** Returns a 409 response when any delegate email already belongs to a registration. */
 export async function alreadyRegisteredResponse(details: RegistrationDetails): Promise<Response | null> {
-    const alreadyRegistered = await Delegate.exists({
+    const existing = await Delegate.findOne({
         email: { $in: details.delegates.map(({ email }) => email) },
-    });
-    if (!alreadyRegistered) return null;
+    }).select("-_id email").lean<{ email: string }>();
+    if (!existing) return null;
+    // Point at the delegate who is already registered so the form can jump to that field.
+    const index = details.delegates.findIndex(({ email }) => email === existing.email);
     return Response.json(
         {
             success: false,
-            error: `One or more of these email addresses is already registered. ${CONTACT_LINE}`,
+            error: `This email address is already registered. ${CONTACT_LINE}`,
             code: "ALREADY_REGISTERED",
+            ...(index >= 0 ? { field: `delegates[${index}].email` } : {}),
         },
         { status: 409 },
     );

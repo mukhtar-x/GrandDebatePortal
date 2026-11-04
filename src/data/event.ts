@@ -8,6 +8,15 @@ export const EVENT_DETAILS = {
   contactPhone: "0314 3552058",
 } as const;
 
+/**
+ * Delegate resources are shown as "Coming soon" until the real PDFs are ready. To publish,
+ * add the PDFs under public/docs (paths in committee-details.ts and RULEBOOK_PATH) and set
+ * the matching switch to true.
+ */
+export const STUDY_GUIDES_PUBLISHED = false;
+export const RULEBOOK_PUBLISHED = false;
+export const RULEBOOK_PATH = "/docs/event-rulebook.pdf";
+
 export const MIN_DELEGATION_SIZE = 4;
 export const MAX_DELEGATION_SIZE = 7;
 

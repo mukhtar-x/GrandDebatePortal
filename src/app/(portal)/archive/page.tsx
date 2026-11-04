@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { COMMITTEE_DETAILS } from "@/data/committee-details";
+import { RULEBOOK_PATH, RULEBOOK_PUBLISHED, STUDY_GUIDES_PUBLISHED } from "@/data/event";
 import { ActionIcon } from "@/components/shared/action-icon";
 import { getCanonicalUrl } from "@/lib/site-url";
 
@@ -62,17 +63,17 @@ export default function ArchivePage() {
         </div>
         <div className="archive-resource-list">
           {GENERAL_RESOURCES.map((resource, index) => {
-            const isRulebook = resource === "Rules of procedure";
+            const available = RULEBOOK_PUBLISHED && resource === "Rules of procedure";
             return (
               <div className="archive-resource" key={resource}>
                 <span className="archive-resource-number">0{index + 1}</span>
                 <span className="archive-resource-title">{resource}</span>
-                {isRulebook ? (
+                {available ? (
                   <>
                     <span className="archive-coming-soon">PDF available</span>
                     <a
                       className="button button-quiet"
-                      href="/docs/event-rulebook.pdf"
+                      href={RULEBOOK_PATH}
                       target="_blank"
                       rel="noreferrer"
                     >
@@ -106,6 +107,7 @@ export default function ArchivePage() {
         </div>
         <div className="archive-folder-list">
           {COMMITTEE_DETAILS.map((committee) => {
+            const guide = STUDY_GUIDES_PUBLISHED ? committee.studyGuideHref : null;
             return (
               <details className="archive-folder" key={committee.code}>
                 <summary>
@@ -114,17 +116,17 @@ export default function ArchivePage() {
                     {committee.name}
                   </span>
                   <span className="archive-folder-status">
-                    {committee.studyGuideHref ? "Study guide available" : "Coming soon"}
+                    {guide ? "Study guide available" : "Coming soon"}
                   </span>
                 </summary>
                 <div className="archive-resource-list archive-folder-content">
-                  {committee.studyGuideHref ? (
+                  {guide ? (
                     <div className="archive-resource">
                       <span className="archive-resource-number">01</span>
                       <span className="archive-resource-title">Study guide · PDF</span>
                       <a
                         className="button button-quiet"
-                        href={committee.studyGuideHref}
+                        href={guide}
                         target="_blank"
                         rel="noreferrer"
                       >
@@ -136,7 +138,7 @@ export default function ArchivePage() {
                       <span className="archive-empty-icon" aria-hidden="true">…</span>
                       <div>
                         <strong>Study guide coming soon</strong>
-                        <p>The PAC guide will be added when it is available.</p>
+                        <p>The {committee.code} guide will be added here when it is published.</p>
                       </div>
                     </div>
                   )}

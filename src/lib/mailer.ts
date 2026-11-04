@@ -3,8 +3,9 @@ import type { Transporter } from "nodemailer";
 import { randomUUID } from "node:crypto";
 import connectDB from "@/lib/db";
 import { firstName } from "@/lib/validation";
-import { EVENT_DETAILS as EVENT } from "@/data/event";
+import { EVENT_DETAILS as EVENT, RECEIPT_MAX_BYTES } from "@/data/event";
 import { quickPayPaymentId } from "@/lib/paymentDetails";
+import { getPublicSiteUrl } from "@/lib/site-url";
 import Application from "@/models/Application";
 import Committee from "@/models/Committee";
 import Delegate from "@/models/Delegate";
@@ -130,8 +131,27 @@ function escapeHtml(value: string): string {
     });
 }
 
+/** TGD_SITE_URL, or Vercel's deployment address, so emails always carry a working portal link. */
 function siteUrl(): string | undefined {
-    return process.env.TGD_SITE_URL?.trim().replace(/\/$/, "") || undefined;
+    return getPublicSiteUrl()?.origin;
+}
+
+/** Portal link that pre-fills the application ID. The email address is never put in the URL. */
+function portalUrl(applicationId: string): string | undefined {
+    const base = siteUrl();
+    return base ? `${base}/portal?id=${encodeURIComponent(applicationId)}` : undefined;
+}
+
+/** Step-by-step portal instructions, with the address written out for clients that hide buttons. */
+function portalSteps(applicationId: string, finalStep: string): string[] {
+    const link = portalUrl(applicationId);
+    return [
+        link
+            ? `Open the application portal: ${link} (or press the button below).`
+            : "Open The Grand Debate website and choose Portal in the menu.",
+        `Enter the email address this message was sent to and your application ID, ${applicationId}, then press Check Status.`,
+        finalStep,
+    ];
 }
 
 /* ------------------------------ HTML ------------------------------ */
@@ -185,9 +205,9 @@ function renderBlockHtml(block: Block): string {
 
 function renderHtml(content: EmailContent, greeting: string, applicationId: string): string {
     const { subject, eyebrow, heading, intro, blocks, ctaLabel } = content;
-    const base = siteUrl();
-    const cta = base
-        ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 4px;"><tr><td align="center" bgcolor="${NAVY}" style="border-radius:4px;"><a href="${escapeHtml(`${base}/portal`)}" style="display:inline-block;padding:12px 22px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold;">${escapeHtml(ctaLabel)}</a></td></tr></table>`
+    const link = portalUrl(applicationId);
+    const cta = link
+        ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 4px;"><tr><td align="center" bgcolor="${NAVY}" style="border-radius:4px;"><a href="${escapeHtml(link)}" style="display:inline-block;padding:12px 22px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold;">${escapeHtml(ctaLabel)}</a></td></tr></table>`
         : "";
 
     // Table layout and inline styles keep the message readable in Gmail, Outlook, and mobile clients.
@@ -271,6 +291,11 @@ function describe(event: MailEvent, applicationId: string): EmailContent {
                             "You receive an email once your payment is confirmed. If the receipt is unclear, we will ask you to upload a new one.",
                             "After your payment is confirmed, your committee and portfolio are allocated ahead of the event, and you are emailed your assignment.",
                         ],
+                    },
+                    {
+                        kind: "steps",
+                        title: "Track your application",
+                        items: portalSteps(applicationId, "Your status, and any action we need from you, appears there."),
                     },
                     {
                         kind: "callout",
@@ -362,11 +387,14 @@ function describe(event: MailEvent, applicationId: string): EmailContent {
                     },
                     {
                         kind: "steps",
-                        title: "How to fix it",
+                        title: "How to upload a new screenshot",
                         items: [
-                            "Open the application portal.",
-                            "Sign in with your registration email and application ID.",
-                            "Upload a clear, complete receipt as an image or PDF, with the amount, date and reference visible.",
+                            ...portalSteps(
+                                applicationId,
+                                "Under \"Action required\", choose your new payment screenshot and press Upload New Screenshot.",
+                            ),
+                            `Use a JPG, PNG, WebP or PDF up to ${RECEIPT_MAX_BYTES / (1024 * 1024)} MB. The amount, date and QuickPay ID must be clearly readable.`,
+                            "Once uploaded, your application returns to \"Payment under review\". You do not need to register again.",
                         ],
                     },
                     {
@@ -444,8 +472,8 @@ function compose(event: MailEvent, name: string, applicationId: string): { subje
     const content = describe(event, applicationId);
     const greeting = `Dear ${firstName(name)},`;
 
-    const base = siteUrl();
-    const portalLine = base ? `\n\n${content.ctaLabel}: ${base}/portal` : "";
+    const link = portalUrl(applicationId);
+    const portalLine = link ? `\n\n${content.ctaLabel}: ${link}` : "";
     const text = [
         greeting,
         content.intro,

@@ -9,6 +9,8 @@ import { parseRegistrationDetails } from "../src/lib/registrationInput";
 import { consumeRateLimit } from "../src/lib/rateLimit";
 import ChallanIssue, { challanIssueStatus } from "../src/models/ChallanIssue";
 import { DEFAULT_COMMITTEE_OPTIONS } from "../src/lib/committeeDefaults";
+import { COMMITTEE_DETAILS } from "../src/data/committee-details";
+import { RULEBOOK_PATH, RULEBOOK_PUBLISHED, STUDY_GUIDES_PUBLISHED } from "../src/data/event";
 import Application from "../src/models/Application";
 import Delegate from "../src/models/Delegate";
 import Payment from "../src/models/Payment";
@@ -77,22 +79,23 @@ await test("input normalization: strips raw HTML and script tags", () => {
     assert.equal(sanitized.delegates[0].fullName, "Delegate 1");
     assert.equal(normalizeEmail(sanitized.email), "amina.demo@example.com");
 });
-await test("study guides: placeholder PDFs exist and are valid PDF-1.4 files", () => {
-    const requiredPdfs = [
-        "public/docs/committees/unsc-study-guide.pdf",
-        "public/docs/committees/disec-study-guide.pdf",
-        "public/docs/committees/sochum-study-guide.pdf",
-        "public/docs/committees/unwomen-study-guide.pdf",
-        "public/docs/committees/pna-study-guide.pdf",
-        "public/docs/event-rulebook.pdf",
+await test("delegate resources: published PDFs are real files; unpublished ones are not shipped", () => {
+    const guides = COMMITTEE_DETAILS.flatMap(({ studyGuideHref }): string[] => (studyGuideHref ? [studyGuideHref] : []));
+    const resources = [
+        ...guides.map((href) => ({ href, published: STUDY_GUIDES_PUBLISHED })),
+        { href: RULEBOOK_PATH, published: RULEBOOK_PUBLISHED },
     ];
-    for (const relPath of requiredPdfs) {
-        const fullPath = path.join(process.cwd(), relPath);
-        assert.ok(fs.existsSync(fullPath), `Missing PDF: ${relPath}`);
-        const buf = fs.readFileSync(fullPath);
-        assert.ok(buf.length > 500, `PDF too small: ${relPath}`);
-        const header = buf.subarray(0, 8).toString("utf8");
-        assert.ok(header.startsWith("%PDF-"), `Invalid PDF header in ${relPath}: ${header}`);
+    for (const { href, published } of resources) {
+        const fullPath = path.join(process.cwd(), "public", href);
+        if (published) {
+            assert.ok(fs.existsSync(fullPath), `Published PDF is missing: ${href}`);
+            const buf = fs.readFileSync(fullPath);
+            assert.ok(buf.subarray(0, 5).toString("utf8") === "%PDF-", `Invalid PDF header in ${href}`);
+            // The old placeholders were under 1 KB; a real guide is far larger.
+            assert.ok(buf.length > 10 * 1024, `PDF looks like an empty placeholder: ${href}`);
+        } else {
+            assert.ok(!fs.existsSync(fullPath), `Unpublished PDF should not be downloadable: ${href}`);
+        }
     }
 });
 await test("committeeDefaults: references correct relative public URLs", () => {
@@ -204,14 +207,20 @@ await test("challan reuse: unused first, grace period respected, expiry after 30
     assert.ok(issueIndexes.some(([fields]) => fields.challanNumber === 1 && fields.reservedAt === 1));
     assert.ok(Payment.schema.path("otherChallanNumbers"), "Payment must record earlier challan numbers.");
 });
-await test("rate limit: in-memory layer refuses once the limit is passed", async () => {
+await test("rate limit: fails closed without its store; the in-memory layer still counts", async () => {
+    // This suite runs without MongoDB, so every call reaches the "store unavailable" path.
     const key = `test-memory-${Date.now()}`;
     const originalError = console.error;
     console.error = () => {};
     try {
-        assert.equal((await consumeRateLimit(key, 2, 60_000)).allowed, true);
-        assert.equal((await consumeRateLimit(key, 2, 60_000)).allowed, true);
-        assert.equal((await consumeRateLimit(key, 2, 60_000)).allowed, false);
+        const first = await consumeRateLimit(key, 2, 60_000);
+        assert.equal(first.allowed, false, "Requests must be refused when limits cannot be enforced.");
+        assert.equal(first.unavailable, true);
+        await consumeRateLimit(key, 2, 60_000);
+        const third = await consumeRateLimit(key, 2, 60_000);
+        assert.equal(third.allowed, false);
+        assert.equal(third.unavailable, undefined, "Past the limit, the in-memory layer refuses before the store is tried.");
+        assert.ok(third.retryAfterSeconds > 0);
     } finally {
         console.error = originalError;
     }

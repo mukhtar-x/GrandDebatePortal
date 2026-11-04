@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ActionIcon } from "@/components/shared/action-icon";
 import Image from "next/image";
 import { COMMITTEE_DETAILS } from "@/data/committee-details";
+import { STUDY_GUIDES_PUBLISHED } from "@/data/event";
 import { getCanonicalUrl } from "@/lib/site-url";
 
 export const metadata: Metadata = {
@@ -62,7 +63,7 @@ export default function CommitteesPage() {
                 <dd>To be confirmed</dd>
               </div>
             </dl>
-            {committee.studyGuideHref ? (
+            {STUDY_GUIDES_PUBLISHED && committee.studyGuideHref ? (
               <a
                 className="button button-quiet committee-guide-button"
                 href={committee.studyGuideHref}
