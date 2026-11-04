@@ -210,7 +210,7 @@ Amounts per challan:
 | Protection | Limit |
 | --- | --- |
 | Challan requests per IP | 10 per minute, 20 per hour |
-| Challan requests per contact email | 2 per 30 minutes |
+| Amount changes per contact email | 2 per 30 minutes. Only counted when the new challan is for a different amount from the email's previous one (delegate count, solo/delegation or rate). Refreshing or fixing details is not counted. |
 | Challans held at once per browser | 5 |
 | Registration submissions per IP | 10 per minute, 20 per hour |
 | Challan release requests per IP | 30 per hour |

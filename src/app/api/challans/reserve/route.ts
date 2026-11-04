@@ -4,6 +4,7 @@ import connectDB from "@/lib/db";
 import {
     CHALLAN_ENVIRONMENT,
     NoChallanAvailableError,
+    challanCategory,
     createReservationToken,
     endReservation,
     ensureDeviceGate,
@@ -98,11 +99,6 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const contactHash = hashSecret(details.contact.email);
-    const emailLimit = await consumeRateLimits([{ key: `challan-reserve-email:${contactHash}`, limit: 2, windowMs: 30 * 60 * 1000 }]);
-    if (!emailLimit.allowed) {
-        return rateLimitedResponse(emailLimit.retryAfterSeconds, "Too many challans were requested for this email. Please wait a while and try again.");
-    }
-
     const draftId = normalizeString(body.draftId);
     const previousToken = normalizeString(body.previousReservationToken);
     const previousTokenHash = typeof previousToken === "string" && TOKEN_PATTERN.test(previousToken) ? hashSecret(previousToken) : null;
@@ -143,6 +139,24 @@ export async function POST(request: Request): Promise<Response> {
                 error: `Challan ${held.challanNumber} is already reserved for this email with different details. Continue with that challan, or generate a new one after ${pktTime(new Date(held.expiresAt))}.`,
                 code: "CHALLAN_HELD",
             }, { status: 409 });
+        }
+
+        // The per-email limit only counts a change of amount (delegate count, solo/delegation or
+        // rate). Refreshing or correcting a typo keeps the same amount and is never counted.
+        const previous = await ChallanIssue.findOne({ environment: CHALLAN_ENVIRONMENT, contactEmail: details.contact.email })
+            .sort({ reservedAt: -1 })
+            .select("-_id category rateType amount")
+            .lean<{ category: string; rateType: string; amount: number }>();
+        const amountChanged = previous !== null && (
+            previous.category !== challanCategory(details.delegates.length) ||
+            previous.rateType !== pricingResult.pricing.rateType ||
+            previous.amount !== pricingResult.pricing.totalPayable
+        );
+        if (amountChanged) {
+            const emailLimit = await consumeRateLimits([{ key: `challan-reserve-email:${contactHash}`, limit: 2, windowMs: 30 * 60 * 1000 }]);
+            if (!emailLimit.allowed) {
+                return rateLimitedResponse(emailLimit.retryAfterSeconds, "The number of delegates or registration type was changed too many times for this email. Please wait a while and try again.");
+            }
         }
 
         await ensureDeviceGate(deviceHash, now);

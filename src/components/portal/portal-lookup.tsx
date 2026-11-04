@@ -127,7 +127,7 @@ export function PortalLookup() {
           <div className="section-heading-icon">01</div>
           <div>
             <p className="section-overline">Application lookup</p>
-            <h2>Track your application</h2>
+            <h2>Enter your details</h2>
           </div>
         </div>
         <form className="lookup-form" onSubmit={handleLookup}>

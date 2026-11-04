@@ -511,6 +511,43 @@ if (serverAvailable) {
                 assert.equal(statusResponse.status, 200);
             });
         }
+
+        await test("POST /api/challans/reserve only counts amount changes against the per-email limit", async () => {
+            // Earlier tests use up this IP's per-minute burst allowance; start in a fresh window.
+            await new Promise((resolve) => setTimeout(resolve, 61_000 - (Date.now() % 60_000)));
+            const tag = `money-${unique}`;
+            const delegation = (size: number, institution: string) => {
+                const delegates = Array.from({ length: size }, (_, index) => ({
+                    fullName: `Money ${index + 1}`,
+                    email: `${tag}-${index}@example.com`,
+                    whatsappNumber: `+9230012345${String(index).padStart(2, "0")}`,
+                    experienceLevel: "None",
+                    firstPreference: "UNSC",
+                    secondPreference: "DISEC",
+                }));
+                return { participantType: "delegation", institution, headName: "Head", headEmail: delegates[0].email, headWhatsapp: delegates[0].whatsappNumber, headIsDelegate: true, delegates };
+            };
+            let token: string | undefined;
+            const reserve = async (registration: ReturnType<typeof delegation>) => {
+                const response = await fetch(`${baseUrl}/api/challans/reserve`, {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ registration, draftId: tag, previousReservationToken: token }),
+                });
+                const body = (await response.json()) as { reservationToken?: string; code?: string };
+                if (body.reservationToken) token = body.reservationToken;
+                return { status: response.status, code: body.code };
+            };
+
+            assert.equal((await reserve(delegation(4, "Money School"))).status, 200, "first challan");
+            assert.equal((await reserve(delegation(4, "Money School A"))).status, 200, "typo fix, same amount");
+            assert.equal((await reserve(delegation(4, "Money School B"))).status, 200, "another typo fix, same amount");
+            assert.equal((await reserve(delegation(5, "Money School B"))).status, 200, "1st amount change");
+            assert.equal((await reserve(delegation(6, "Money School B"))).status, 200, "2nd amount change");
+            const third = await reserve(delegation(7, "Money School B"));
+            assert.equal(third.status, 429, "3rd amount change within 30 minutes is refused");
+            assert.equal(third.code, "RATE_LIMITED");
+        });
     } else if (process.env.RUN_WRITE_TESTS === "1") {
         skipped += 1;
         console.info("SKIP valid registration writes because MongoDB is unavailable.");

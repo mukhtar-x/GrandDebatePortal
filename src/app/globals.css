@@ -3592,12 +3592,13 @@ textarea.form-control {
   padding-top: 36px;
 }
 
+/* Same columns and gap as .registration-layout, so the countdown sits exactly above the sidebar. */
 .registration-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1.55fr) minmax(260px, 0.72fr);
   align-items: end;
-  gap: 28px;
-  margin-bottom: 28px;
+  gap: 24px;
+  margin-bottom: 24px;
 }
 
 .registration-heading h1 {
@@ -3617,18 +3618,49 @@ textarea.form-control {
   margin: 10px 0 0;
 }
 
+/* A sidebar-width card: heading on top, the clock spanning the full width below. */
 .registration-header .registration-countdown {
-  gap: 18px;
-  padding: 14px 18px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  padding: 18px 20px;
 }
 
 .registration-header .countdown-copy h2 {
   font-size: 16px;
 }
 
+.registration-header .countdown-clock {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .registration-header .countdown-unit {
-  min-width: 52px;
-  padding: 6px 8px;
+  min-width: 0;
+  padding: 7px 4px;
+}
+
+/* The card is sidebar-width, so the unit labels need less tracking to fit four across. */
+.registration-header .countdown-unit span {
+  letter-spacing: 0.03em;
+}
+
+/* Portal: a readable column instead of full-page-width inputs. */
+.portal-page .portal-lookup-layout {
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+@media (min-width: 700px) {
+  .portal-page .lookup-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .portal-page .lookup-form > :not(.field) {
+    grid-column: 1 / -1;
+  }
 }
 
 .registration-header .countdown-unit strong {
@@ -3667,9 +3699,10 @@ html[data-intro="pending"] .site-intro-content {
   }
 }
 
-@media (max-width: 860px) {
+/* Below 980px the sidebar is too narrow for the clock, so it becomes a full-width bar. */
+@media (max-width: 980px) {
   .registration-header {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     align-items: start;
     gap: 18px;
   }

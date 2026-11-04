@@ -81,12 +81,7 @@ export default function ArchivePage() {
                     </a>
                   </>
                 ) : (
-                  <>
-                    <span className="archive-coming-soon">Coming soon</span>
-                    <button className="button button-quiet" type="button" disabled>
-                      Download
-                    </button>
-                  </>
+                  <span className="archive-coming-soon">Coming soon</span>
                 )}
               </div>
             );
