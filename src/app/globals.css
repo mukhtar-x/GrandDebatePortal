@@ -433,20 +433,25 @@ textarea:focus-visible {
 }
 
 .brand-ambassador-callout {
-  display: flex;
+  display: grid;
   width: min(100% - 56px, 1190px);
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
   margin: 0 auto 30px;
-  padding: 22px 25px;
+  padding: 26px;
   border: 1px solid rgba(201, 160, 85, 0.42);
   border-radius: 14px;
   background: linear-gradient(110deg, rgba(32, 53, 101, 0.58), rgba(8, 21, 45, 0.76));
 }
 
 .brand-ambassador-copy {
-  max-width: 650px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+}
+
+.brand-ambassador-heading {
+  grid-column: 1;
 }
 
 .brand-ambassador-copy .section-overline {
@@ -465,12 +470,59 @@ textarea:focus-visible {
 .brand-ambassador-copy > p:last-child {
   margin: 7px 0 0;
   color: rgba(255, 255, 255, 0.68);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.7;
 }
 
+.brand-ambassador-benefits {
+  grid-column: 1;
+}
+
+.brand-ambassador-benefits-label {
+  margin: 0 0 10px;
+  color: var(--grand-gold);
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.brand-ambassador-perks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  line-height: 1.5;
+  list-style: none;
+}
+
+.brand-ambassador-perks li {
+  display: flex;
+  min-height: 82px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  padding: 12px 15px;
+  border: 1px solid rgba(201, 160, 85, 0.2);
+  border-radius: 9px;
+  background: rgba(6, 17, 37, 0.32);
+}
+
+.brand-ambassador-perks strong,
+.brand-ambassador-award strong {
+  color: var(--desert-sand);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.015em;
+}
+
 .brand-ambassador-callout .button {
-  flex: 0 0 auto;
+  justify-self: start;
   gap: 12px;
 }
 
@@ -1516,15 +1568,44 @@ textarea.form-control {
 
 @media (max-width: 640px) {
   .registration-steps {
-    padding: 10px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    padding: 10px 6px;
+  }
+
+  .registration-steps li {
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 5px;
+    text-align: center;
+  }
+
+  .registration-steps li:not(:last-child)::after {
+    position: absolute;
+    top: 12px;
+    left: calc(50% + 13px);
+    display: block;
+    width: calc(100% - 26px);
+    min-width: 0;
+    flex: none;
+  }
+
+  .registration-steps li.is-complete:not(:last-child)::after {
+    background: rgba(201, 160, 85, 0.65);
+  }
+
+  .registration-steps .step-label {
+    display: block;
+    width: 100%;
+    overflow: visible;
+    font-size: 9px;
+    line-height: 1.2;
+    text-overflow: clip;
+    white-space: normal;
   }
 
   .registration-steps li:not(.is-current) .step-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
+    visibility: hidden;
   }
 
   .form-navigation {
@@ -1740,6 +1821,41 @@ textarea.form-control {
   margin: 10px 0 0;
   color: rgba(13, 30, 59, 0.64);
   font-size: 9px;
+}
+
+.summary-deadline + .summary-deadline {
+  margin-top: 5px;
+}
+
+.payment-fee-note {
+  display: grid;
+  gap: 6px;
+  margin: -4px 0 18px;
+  padding: 12px 14px;
+  border-left: 2px solid var(--grand-gold);
+  background: rgba(201, 160, 85, 0.08);
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.payment-fee-note > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.payment-fee-note strong {
+  color: var(--desert-sand);
+  white-space: nowrap;
+}
+
+.payment-fee-note .payment-fee-total {
+  margin-top: 3px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(229, 204, 179, 0.2);
+  color: var(--white);
+  font-weight: 700;
 }
 
 .sidebar-card {
@@ -2612,14 +2728,20 @@ textarea.form-control {
   .brand-ambassador-callout {
     width: min(100% - 30px, 1190px);
     align-items: stretch;
-    flex-direction: column;
+    grid-template-columns: 1fr;
     gap: 16px;
     margin-bottom: 20px;
     padding: 18px;
   }
 
   .brand-ambassador-callout .button {
+    justify-self: stretch;
     width: 100%;
+  }
+
+  .brand-ambassador-perks {
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 
   .registration-countdown {
@@ -3290,6 +3412,16 @@ textarea.form-control {
   color: rgba(255, 255, 255, 0.66);
   font-size: 10px;
   line-height: 1.75;
+}
+
+@media (min-width: 761px) {
+  .committee-card h2 {
+    min-height: 4.5em;
+  }
+
+  .committee-agenda-description {
+    min-height: 165px;
+  }
 }
 
 .committee-suited {

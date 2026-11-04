@@ -7,6 +7,7 @@ import {
   MIN_DELEGATION_SIZE,
 } from "@/data/event";
 import { CommitteePreferences } from "@/components/registration/committee-preferences";
+import { formatWhatsAppNumber } from "@/components/registration/types";
 import type {
   DelegateFormValues,
   DelegationFormValues,
@@ -74,6 +75,8 @@ export function DelegationFields({
             label="Institution"
             placeholder="School, college or university"
             autoComplete="organization"
+            autoCapitalize="words"
+            onBlur={(event) => onFieldChange("institution", event.currentTarget.value.trim().replace(/\s+/g, " "))}
             value={value.institution}
             onChange={(event) => onFieldChange("institution", event.currentTarget.value)}
             required
@@ -106,6 +109,8 @@ export function DelegationFields({
             name="headDelegateFullName"
             label="Full name"
             autoComplete="name"
+            autoCapitalize="words"
+            onBlur={(event) => onFieldChange("headName", event.currentTarget.value.trim().replace(/\s+/g, " "))}
             value={value.headName}
             onChange={(event) => onFieldChange("headName", event.currentTarget.value)}
             required
@@ -117,6 +122,7 @@ export function DelegationFields({
             label="Email address"
             placeholder="you@example.com"
             autoComplete="email"
+            onBlur={(event) => onFieldChange("headEmail", event.currentTarget.value.trim().toLowerCase())}
             value={value.headEmail}
             onChange={(event) => onFieldChange("headEmail", event.currentTarget.value)}
             required
@@ -129,7 +135,9 @@ export function DelegationFields({
             label="WhatsApp number"
             placeholder="+92 300 1234567"
             autoComplete="tel"
-            pattern="\+?[0-9\s()-]{10,18}"
+            inputMode="tel"
+            onBlur={(event) => onFieldChange("headWhatsapp", formatWhatsAppNumber(event.currentTarget.value))}
+            pattern="\+?[0-9\s\x28\x29\x2d]{10,18}"
             title="Enter a valid number with country code."
             value={value.headWhatsapp}
             onChange={(event) => onFieldChange("headWhatsapp", event.currentTarget.value)}
@@ -207,6 +215,8 @@ export function DelegationFields({
                     name={"delegates[" + index + "][fullName]"}
                     label="Full name"
                     autoComplete="name"
+                    autoCapitalize="words"
+                    onBlur={(event) => onDelegateChange(index, "fullName", event.currentTarget.value.trim().replace(/\s+/g, " "))}
                     value={delegate.fullName}
                     readOnly={isHeadDelegate}
                     onChange={(event) =>
@@ -220,6 +230,7 @@ export function DelegationFields({
                     type="email"
                     label="Email address"
                     autoComplete="email"
+                    onBlur={(event) => onDelegateChange(index, "email", event.currentTarget.value.trim().toLowerCase())}
                     value={delegate.email}
                     readOnly={isHeadDelegate}
                     onChange={(event) =>
@@ -234,7 +245,9 @@ export function DelegationFields({
                     label="WhatsApp number"
                     placeholder="+92 300 1234567"
                     autoComplete="tel"
-                    pattern="\+?[0-9\s()-]{10,18}"
+                    inputMode="tel"
+                    onBlur={(event) => onDelegateChange(index, "whatsapp", formatWhatsAppNumber(event.currentTarget.value))}
+                    pattern="\+?[0-9\s\x28\x29\x2d]{10,18}"
                     title="Enter a valid number with country code."
                     value={delegate.whatsapp}
                     readOnly={isHeadDelegate}

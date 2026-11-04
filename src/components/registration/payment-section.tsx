@@ -2,7 +2,7 @@ import { useState, type Ref } from "react";
 import { InputField } from "@/components/ui/form-fields";
 import { DELEGATION_FEE, EVENT_DETAILS, RECEIPT_MAX_BYTES, RECEIPT_TYPES, formatPKR } from "@/data/event";
 import type { ChallanReservation } from "@/lib/api/registration";
-import { QUICKPAY_BILLER_CODE, quickPayPaymentId } from "@/lib/paymentDetails";
+import { QUICKPAY_BILLER_CODE, QUICKPAY_SERVICE_CHARGE, quickPayPaymentId } from "@/lib/paymentDetails";
 
 interface PaymentSectionProps {
   delegateCount: number;
@@ -163,6 +163,13 @@ export function PaymentSection({
             <li>Pay exactly <strong>{formatPKR(reservation.amount)}</strong>. Keep the QuickPay ID visible on the receipt.</li>
             <li>Upload the payment screenshot or receipt and submit before the timer ends.</li>
           </ol>
+          {!reservation.test ? (
+            <div className="payment-fee-note" aria-label="Payment total including KuickPay service charge">
+              <span>Registration fee <strong>{formatPKR(reservation.amount)}</strong></span>
+              <span>KuickPay service charge <strong>{formatPKR(QUICKPAY_SERVICE_CHARGE)}</strong></span>
+              <span className="payment-fee-total">Total at payment <strong>{formatPKR(reservation.amount + QUICKPAY_SERVICE_CHARGE)}</strong></span>
+            </div>
+          ) : null}
         </>
       ) : (
         <div className="payment-instructions">

@@ -1,5 +1,6 @@
 /** Five-digit KuickPay biller code supplied by FAST Accounts. */
 export const QUICKPAY_BILLER_CODE = "10320";
+export const QUICKPAY_SERVICE_CHARGE = 60;
 
 export function quickPayPaymentId(challanNumber: string) {
     return `${QUICKPAY_BILLER_CODE}${challanNumber}`;

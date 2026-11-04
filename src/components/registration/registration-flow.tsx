@@ -36,6 +36,7 @@ import {
   type RegistrationSuccess,
 } from "@/lib/api/registration";
 import { quickPayPaymentId } from "@/lib/paymentDetails";
+import { QUICKPAY_SERVICE_CHARGE } from "@/lib/paymentDetails";
 
 const STEPS = ["Type", "Details", "Review", "Payment"] as const;
 const DRAFT_STORAGE_KEY = "tgd26-registration-draft";
@@ -135,10 +136,19 @@ function FeeSummary({
         <strong>{formatPKR(registrationWindow.feePerDelegate)} each</strong>
       </div>
       {delegateCount > 1 ? <div className="summary-line"><span>Delegation fee</span><strong>{formatPKR(DELEGATION_FEE)}</strong></div> : null}
-      <div className="summary-total">
-        <span>Total payable</span>
+      <div className="summary-line">
+        <span>Registration fee</span>
         <strong aria-live="polite" aria-atomic="true">{formatPKR(total)}</strong>
       </div>
+      <div className="summary-line">
+        <span>KuickPay service charge</span>
+        <strong>{formatPKR(QUICKPAY_SERVICE_CHARGE)}</strong>
+      </div>
+      <div className="summary-total">
+        <span>Total at payment</span>
+        <strong aria-live="polite" aria-atomic="true">{formatPKR(total + QUICKPAY_SERVICE_CHARGE)}</strong>
+      </div>
+      <p className="summary-deadline">KuickPay collects this charge separately from the registration fee.</p>
       <p className="summary-deadline">
         Rate available until {registrationWindow.deadline}.
       </p>
@@ -157,7 +167,7 @@ function ReviewDetails({
   solo: SoloFormValues;
   delegation: DelegationFormValues;
   baCode: string;
-  onEdit: () => void;
+  onEdit: (targetId: string, step?: number) => void;
 }) {
   const delegates = registrationType === "solo" ? [solo] : delegation.delegates;
   return (
@@ -165,7 +175,7 @@ function ReviewDetails({
       <section className="review-group">
         <div className="review-group-heading">
           <h3>Registration</h3>
-          <button className="review-edit" type="button" onClick={onEdit}>Edit</button>
+          <button className="review-edit" type="button" onClick={() => onEdit("registration-ba-code")}>Edit</button>
         </div>
         <dl className="review-list">
           <div><dt>Type</dt><dd>{registrationType === "solo" ? "Solo delegate" : `Delegation of ${delegation.size}`}</dd></div>
@@ -178,7 +188,7 @@ function ReviewDetails({
         <section className="review-group">
           <div className="review-group-heading">
             <h3>Head delegate</h3>
-            <button className="review-edit" type="button" onClick={onEdit}>Edit</button>
+            <button className="review-edit" type="button" onClick={() => onEdit("head-name")}>Edit</button>
           </div>
           <dl className="review-list">
             <div><dt>Name</dt><dd>{delegation.headName}</dd></div>
@@ -193,7 +203,7 @@ function ReviewDetails({
         <section className="review-group" key={index}>
           <div className="review-group-heading">
             <h3>{registrationType === "solo" ? "Your details" : `Delegate ${index + 1}`}</h3>
-            <button className="review-edit" type="button" onClick={onEdit}>Edit</button>
+            <button className="review-edit" type="button" onClick={() => onEdit(registrationType === "solo" ? "solo-full-name" : `delegate-${index}-name`)}>Edit</button>
           </div>
           <dl className="review-list">
             <div><dt>Name</dt><dd>{delegate.fullName}</dd></div>
@@ -260,7 +270,7 @@ export function RegistrationFlow() {
         setRegistrationType(stored.registrationType);
         setSolo(stored.solo);
         setDelegation(stored.delegation);
-        setBaCode(stored.baCode);
+        setBaCode(stored.baCode.toUpperCase());
         draftId.current = stored.draftId;
         setReservation(live ? stored.reservation : null);
         setReservedKey(live ? stored.reservedKey : null);
@@ -308,6 +318,15 @@ export function RegistrationFlow() {
     setFlowError(null);
     setSubmitError(null);
     setChallanInvalid(false);
+  }
+
+  function editReviewField(targetId: string, targetStep = 2) {
+    goToStep(targetStep);
+    window.setTimeout(() => {
+      const target = document.getElementById(targetId);
+      target?.focus();
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
   }
 
   function handleSoloChange(field: keyof SoloFormValues, value: string) {
@@ -670,7 +689,8 @@ export function RegistrationFlow() {
               label="BA Code"
               value={baCode}
               maxLength={50}
-              onChange={(event) => setBaCode(event.currentTarget.value)}
+              onChange={(event) => setBaCode(event.currentTarget.value.toUpperCase())}
+              autoCapitalize="characters"
               placeholder="Enter your BA Code, if you have one"
               autoComplete="off"
               hint="Optional. Enter the code provided by your Brand Ambassador."
@@ -699,7 +719,7 @@ export function RegistrationFlow() {
             solo={solo}
             delegation={delegation}
             baCode={baCode}
-            onEdit={() => goToStep(2)}
+            onEdit={editReviewField}
           />
           {staleChallan ? (
             <div className="review-notice" role="note">
@@ -723,14 +743,14 @@ export function RegistrationFlow() {
           </div>
         </section> : null}
 
-        <div className="registration-mobile-summary">
+        {step >= 3 ? <div className="registration-mobile-summary">
           <FeeSummary
             registrationType={registrationType}
             delegateCount={delegateCount}
             registrationWindow={registrationWindow}
             total={reservationMatches && reservation ? reservation.amount : total}
           />
-        </div>
+        </div> : null}
 
         {step === 4 ? <PaymentSection
           delegateCount={delegateCount}
@@ -787,14 +807,14 @@ export function RegistrationFlow() {
       </form>
 
       <aside className="registration-sidebar">
-        <div className="registration-desktop-summary">
+        {step >= 3 ? <div className="registration-desktop-summary">
           <FeeSummary
             registrationType={registrationType}
             delegateCount={delegateCount}
             registrationWindow={registrationWindow}
             total={reservationMatches && reservation ? reservation.amount : total}
           />
-        </div>
+        </div> : null}
 
         <section className="sidebar-card event-aside">
           <p className="section-overline">Conference details</p>
