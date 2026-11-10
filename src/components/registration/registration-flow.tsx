@@ -39,6 +39,10 @@ import { quickPayPaymentId } from "@/lib/paymentDetails";
 import { saveApplication } from "@/lib/savedApplication";
 import { QUICKPAY_SERVICE_CHARGE } from "@/lib/paymentDetails";
 
+// TEMPORARY REGISTRATION PAUSE — set to `false` to resume registration.
+// While true, the challan-reserve and register APIs are never called and the buttons read "Registration paused".
+const REGISTRATION_PAUSED = true;
+
 const STEPS = ["Type", "Details", "Review", "Payment"] as const;
 const DRAFT_STORAGE_KEY = "tgd26-registration-draft";
 
@@ -498,6 +502,7 @@ export function RegistrationFlow() {
    * `force` always asks the server, which returns the same challan if it is still held for these details.
    */
   async function continueToPayment(force = false) {
+    if (REGISTRATION_PAUSED) return; // TEMPORARY PAUSE: skip the challan-reserve API.
     if (reserving) return;
     if (!force && reservationMatches && isReservationLive(reservation)) {
       goToStep(4);
@@ -529,6 +534,7 @@ export function RegistrationFlow() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (REGISTRATION_PAUSED) return; // TEMPORARY PAUSE: skip the register API.
     if (step !== 4 || !reservation || submitting) return;
     if (!event.currentTarget.reportValidity()) return;
     if (!receipt) {
@@ -844,8 +850,10 @@ export function RegistrationFlow() {
           ) : null}
           <div className="form-navigation">
             <button className="button button-quiet" type="button" onClick={() => goToStep(2)}>Edit details</button>
-            <button className="button button-primary" type="button" onClick={() => void continueToPayment()} disabled={reserving} aria-busy={reserving}>
-              {reserving
+            <button className="button button-primary" type="button" onClick={() => void continueToPayment()} disabled={REGISTRATION_PAUSED || reserving} aria-busy={reserving}>
+              {REGISTRATION_PAUSED
+                ? "Registration paused"
+                : reserving
                 ? "Reserving challan…"
                 : reservationMatches && reservationLive
                   ? "Continue to payment"
@@ -897,10 +905,10 @@ export function RegistrationFlow() {
           <button
             className="button button-primary submit-button"
             type="submit"
-            disabled={submitting || !reservation || expired}
+            disabled={REGISTRATION_PAUSED || submitting || !reservation || expired}
             aria-busy={submitting}
           >
-            {submitting ? "Submitting…" : expired ? "Challan expired" : "Submit registration"}{" "}
+            {REGISTRATION_PAUSED ? "Registration paused" : submitting ? "Submitting…" : expired ? "Challan expired" : "Submit registration"}{" "}
             <ActionIcon />
           </button>
           <p className="submit-footnote">
