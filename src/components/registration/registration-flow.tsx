@@ -662,6 +662,23 @@ export function RegistrationFlow() {
     );
   }
 
+  // TEMPORARY PAUSE: show a paused notice instead of the form.
+  if (REGISTRATION_PAUSED) {
+    return (
+      <section className="registration-closed-card">
+        <span className="closed-seal" aria-hidden="true">
+          ✦
+        </span>
+        <p className="section-overline">Registration paused</p>
+        <h2>Registration is temporarily paused.</h2>
+        <p>We&apos;ll reopen registration shortly. Please check back soon. Already registered? You can track your application in the portal.</p>
+        <Link className="button button-primary" href="/portal">
+          Go to Portal <ActionIcon />
+        </Link>
+      </section>
+    );
+  }
+
   const staleChallan = reservation !== null && !reservationMatches && reservationLive;
 
   return (
