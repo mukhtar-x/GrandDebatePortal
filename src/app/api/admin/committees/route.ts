@@ -26,8 +26,11 @@ export async function GET(request: Request): Promise<Response> {
                 applicationId: string;
                 fullName: string;
                 email: string;
+                experienceLevel?: string;
+                additionalInfo?: string;
                 firstPreference: string;
                 secondPreference: string;
+                institution?: string;
             }>([
                 { $match: { $or: [{ assignedCommittee: null }, { assignedCommittee: { $exists: false } }] } },
                 {
@@ -42,7 +45,28 @@ export async function GET(request: Request): Promise<Response> {
                 { $match: { "payment.0": { $exists: true } } },
                 { $sort: { createdAt: 1 } },
                 { $limit: 100 },
-                { $project: { fullName: 1, email: 1, applicationId: 1, firstPreference: 1, secondPreference: 1 } },
+                {
+                    $lookup: {
+                        from: Application.collection.name,
+                        localField: "applicationId",
+                        foreignField: "applicationId",
+                        as: "application",
+                        pipeline: [{ $project: { institution: 1 } }],
+                    },
+                },
+                { $unwind: { path: "$application", preserveNullAndEmptyArrays: true } },
+                {
+                    $project: {
+                        fullName: 1,
+                        email: 1,
+                        applicationId: 1,
+                        experienceLevel: 1,
+                        additionalInfo: 1,
+                        firstPreference: 1,
+                        secondPreference: 1,
+                        institution: "$application.institution",
+                    },
+                },
             ]),
             Delegate.aggregate([
                 { $match: { assignedCommittee: { $type: "string", $ne: "" } } },
@@ -91,6 +115,9 @@ export async function GET(request: Request): Promise<Response> {
                 applicationId: delegate.applicationId,
                 fullName: delegate.fullName,
                 email: delegate.email,
+                experienceLevel: delegate.experienceLevel,
+                additionalInfo: delegate.additionalInfo,
+                institution: delegate.institution,
                 firstPreference: delegate.firstPreference,
                 secondPreference: delegate.secondPreference,
             })),

@@ -126,6 +126,9 @@ interface AvailableDelegate {
     applicationId: string;
     fullName: string;
     email: string;
+    institution?: string;
+    experienceLevel?: string;
+    additionalInfo?: string;
     firstPreference: string;
     secondPreference: string;
 }
@@ -797,12 +800,26 @@ export default function AdminDashboard() {
                                 <div className="admin-unallocated-list">
                                     {data.unallocatedDelegates.map((delegate) => {
                                         const preference = committeeByDelegate[delegate.id] || delegate.firstPreference;
-                                        return <form className="admin-allocate-row" key={delegate.id} onSubmit={(event) => { event.preventDefault(); void allocateDelegate(delegate); }}>
-                                            <div><strong>{delegate.fullName}</strong><span>{delegate.email} · {delegate.applicationId}</span></div>
-                                            <select aria-label={`Committee preference for ${delegate.fullName}`} value={preference} onChange={(event) => setCommitteeByDelegate((current) => ({ ...current, [delegate.id]: event.target.value }))}><option value={delegate.firstPreference}>1st · {delegate.firstPreference}</option><option value={delegate.secondPreference}>2nd · {delegate.secondPreference}</option></select>
-                                            <input aria-label={`Country or portfolio for ${delegate.fullName}`} placeholder="Country / portfolio" maxLength={100} value={portfolioByDelegate[delegate.id] ?? ""} onChange={(event) => setPortfolioByDelegate((current) => ({ ...current, [delegate.id]: event.target.value }))} required />
-                                            <button className="admin-button admin-button-primary" type="submit" disabled={actionBusy === delegate.id}>{actionBusy === delegate.id ? "Saving…" : "Allocate"}</button>
-                                        </form>;
+                                        return <div className="admin-unallocated-card" key={delegate.id}>
+                                            <form className="admin-allocate-row" onSubmit={(event) => { event.preventDefault(); void allocateDelegate(delegate); }}>
+                                                <div>
+                                                    <div className="admin-unallocated-identity">
+                                                        <strong>{delegate.fullName}</strong>
+                                                        <span>{delegate.email} · {delegate.applicationId}</span>
+                                                    </div>
+                                                </div>
+                                                <select aria-label={`Committee preference for ${delegate.fullName}`} value={preference} onChange={(event) => setCommitteeByDelegate((current) => ({ ...current, [delegate.id]: event.target.value }))}><option value={delegate.firstPreference}>1st · {delegate.firstPreference}</option><option value={delegate.secondPreference}>2nd · {delegate.secondPreference}</option></select>
+                                                <input aria-label={`Country or portfolio for ${delegate.fullName}`} placeholder="Country / portfolio" maxLength={100} value={portfolioByDelegate[delegate.id] ?? ""} onChange={(event) => setPortfolioByDelegate((current) => ({ ...current, [delegate.id]: event.target.value }))} required />
+                                                <button className="admin-button admin-button-primary" type="submit" disabled={actionBusy === delegate.id}>{actionBusy === delegate.id ? "Saving…" : "Allocate"}</button>
+                                            </form>
+                                            <div className="admin-unallocated-details">
+                                                <dl>
+                                                    <div><dt>Institution</dt><dd>{delegate.institution || "Not provided"}</dd></div>
+                                                    <div><dt>Prior MUN experience</dt><dd>{delegate.experienceLevel || "Not provided"}</dd></div>
+                                                    {delegate.additionalInfo ? <div className="admin-unallocated-additional"><dt>Additional information</dt><dd>{delegate.additionalInfo}</dd></div> : null}
+                                                </dl>
+                                            </div>
+                                        </div>;
                                     })}
                                 </div>
                             )}
