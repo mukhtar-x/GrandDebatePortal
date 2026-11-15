@@ -34,6 +34,17 @@ export type MailEvent =
     | { type: "paymentConfirmed" }
     | { type: "actionRequired"; reason: string }
     | { type: "committeeAllocated"; committee: string; portfolio: string }
+    | {
+          type: "committeeReallocated";
+          previousCommittee: string;
+          previousPortfolio: string;
+          committee: string;
+          portfolio: string;
+          firstPreference: string;
+          delegateStatus: string;
+          applicationStatus: string;
+          paymentStatus: string;
+      }
     | { type: "waitlisted" };
 
 const BRAND = EVENT.name;
@@ -438,6 +449,49 @@ function describe(event: MailEvent, applicationId: string): EmailContent {
                 ctaLabel: "View assignment details",
             };
 
+        case "committeeReallocated":
+            const changeDescription =
+                event.previousCommittee.toLowerCase() === event.committee.toLowerCase()
+                    ? `Your committee remains ${event.committee}, but your portfolio has changed from ${event.previousPortfolio} to ${event.portfolio}.`
+                    : `Your assignment has changed from ${event.previousCommittee} (${event.previousPortfolio}) to ${event.committee} (${event.portfolio}).`;
+            return {
+                subject: `Updated committee assignment: ${applicationId}`,
+                eyebrow: "Assignment updated",
+                heading: "Your committee assignment has changed.",
+                intro: `${changeDescription} The updated placement was made with your first committee preference (${event.firstPreference}) in mind. To keep delegations balanced, no more than two delegates from the same delegation are placed in one committee. Please use the assignment below as your current placement.`,
+                blocks: [
+                    {
+                        kind: "facts",
+                        title: "Current assignment",
+                        items: [
+                            { label: "Committee", value: event.committee },
+                            { label: "Portfolio", value: event.portfolio },
+                            { label: "First preference", value: event.firstPreference },
+                        ],
+                    },
+                    {
+                        kind: "table",
+                        title: "Current status",
+                        rows: [
+                            { label: "Delegate status", value: event.delegateStatus },
+                            { label: "Application status", value: event.applicationStatus },
+                            { label: "Payment status", value: event.paymentStatus },
+                        ],
+                    },
+                    EVENT_DETAILS,
+                    {
+                        kind: "steps",
+                        title: "Next steps",
+                        items: [
+                            "Review your current assignment and preparation information in the portal.",
+                            "Research your portfolio and your committee's agenda as it is announced.",
+                            "Use the study guides and resources as they are released.",
+                        ],
+                    },
+                ],
+                ctaLabel: "View assignment details",
+            };
+
         case "waitlisted":
             return {
                 subject: `Waitlist update: ${applicationId}`,
@@ -513,6 +567,7 @@ async function send(event: MailEvent, applicationId: string, to: string, name: s
 }
 
 const SMOKE_TEST_RECIPIENTS = new Set(["ismailsilat7@gmail.com", "k240546@nu.edu.pk"]);
+const REALLOCATION_SMOKE_TEST_RECIPIENT = "k240511@nu.edu.pk";
 
 /** Sends synthetic registration messages without reading or writing application records. */
 export async function sendRegistrationSmokeTest(
@@ -540,6 +595,30 @@ export async function sendRegistrationSmokeTest(
     };
     const name = participantType === "solo" ? "Sample Solo Delegate" : "Sample Delegation Lead";
     return send(event, applicationId, to, name);
+}
+
+/** Sends a clearly labelled reallocation sample only to the project owner's test address. */
+export async function sendReallocationSmokeTest(): Promise<boolean> {
+    if (process.env.NODE_ENV === "production") {
+        throw new Error("Email smoke tests are disabled in production.");
+    }
+
+    return send(
+        {
+            type: "committeeReallocated",
+            previousCommittee: "TEST — Previous Committee",
+            previousPortfolio: "TEST — Previous Portfolio",
+            committee: "TEST — New Committee",
+            portfolio: "TEST — Sample Portfolio",
+            firstPreference: "TEST — First Preference",
+            delegateStatus: "Active (test)",
+            applicationStatus: "Committee allocated (test)",
+            paymentStatus: "Confirmed (test)",
+        },
+        "TGD-TEST-REALLOCATION",
+        REALLOCATION_SMOKE_TEST_RECIPIENT,
+        "Test Delegate",
+    );
 }
 
 /** Sends to the solo delegate or the head delegate of a delegation. */
@@ -580,4 +659,38 @@ export async function notifyDelegate(delegateId: string, event: MailEvent): Prom
     } catch (error) {
         console.error(`Email ${event.type} for delegate ${delegateId} could not be prepared:`, error);
     }
+}
+
+export interface ReallocationEmailDetails {
+    applicationId: string;
+    email: string;
+    fullName: string;
+    previousCommittee: string;
+    previousPortfolio: string;
+    committee: string;
+    portfolio: string;
+    firstPreference: string;
+    delegateStatus: string;
+    applicationStatus: string;
+    paymentStatus: string;
+}
+
+/** Sends the reallocation notice using values freshly read from the database by the caller. */
+export async function sendReallocationEmail(details: ReallocationEmailDetails): Promise<boolean> {
+    return send(
+        {
+            type: "committeeReallocated",
+            previousCommittee: details.previousCommittee,
+            previousPortfolio: details.previousPortfolio,
+            committee: details.committee,
+            portfolio: details.portfolio,
+            firstPreference: details.firstPreference,
+            delegateStatus: details.delegateStatus,
+            applicationStatus: details.applicationStatus,
+            paymentStatus: details.paymentStatus,
+        },
+        details.applicationId,
+        details.email,
+        details.fullName,
+    );
 }
