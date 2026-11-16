@@ -1,4 +1,5 @@
 import { STUDY_GUIDES_PUBLISHED } from "@/data/event";
+import { COMMITTEE_DETAILS } from "@/data/committee-details";
 import connectDB from "@/lib/db";
 import { firstName, isRecord, normalizeEmail, stripHtml } from "@/lib/validation";
 import Application, { type IApplication } from "@/models/Application";
@@ -147,6 +148,7 @@ export async function buildPortalStatus(access: PortalAccess) {
 
     const committeeCode = viewerDelegate?.assignedCommittee ?? null;
     const portfolio = viewerDelegate?.assignedPortfolio ?? null;
+    const committeeDetails = COMMITTEE_DETAILS.find(({ code }) => code === committeeCode);
     const committee = committeeCode
         ? await Committee.findOne({ code: committeeCode })
               .select("-_id code name studyGuideUrl")
@@ -173,7 +175,7 @@ export async function buildPortalStatus(access: PortalAccess) {
         committee: committeeCode,
         committeeName: committee?.name ?? null,
         portfolio,
-        studyGuideUrl: STUDY_GUIDES_PUBLISHED ? committee?.studyGuideUrl ?? null : null,
+        studyGuideUrl: STUDY_GUIDES_PUBLISHED ? committeeDetails?.studyGuideHref ?? null : null,
         payment: isContact && payment
             ? { totalPayable: payment.totalPayable, rateType: payment.rateType, status: payment.paymentStatus, challanNumber: payment.challanNumber, test: payment.challanEnvironment === "test" }
             : null,
