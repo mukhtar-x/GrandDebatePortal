@@ -8,7 +8,7 @@ export const COMMITTEE_DETAILS = [
     agenda: "The Mecca Pact: Assessing Its Implications for International Peace and Security",
     agendaDescription:
       "Signed on 7 August 2026, the Mecca Pact binds Saudi Arabia, Turkey and Pakistan in a mutual defence alliance under which an armed attack on one is treated as an attack on all. Activated for the first time in October amid Houthi attacks on Saudi Arabia, it now raises urgent questions for the Security Council: can a regional alliance bring stability or will it widen existing conflicts, and what does its rise mean for the future of international peace and security?",
-    studyGuideHref: "/docs/committees/unsc-study-guide.pdf",
+    studyGuideHref: "https://drive.google.com/file/d/1Zb1VrrA0nq7Cb8ZhYBtSyRB8IkFR__yw/view?usp=drivesdk",
     suitedTo: "Delegates who are comfortable with fast-paced, high-stakes negotiation.",
   },
   {
@@ -20,7 +20,7 @@ export const COMMITTEE_DETAILS = [
     agenda: "Regulating Drones and Emerging Military Technologies in 21st Century Conflicts",
     agendaDescription:
       "From drone warfare in Ukraine and long-range missile and drone attacks from Yemen to exploding pagers in Lebanon and reported AI-assisted targeting in Gaza, new technologies are changing how wars are fought and who bears their cost. As these weapons spread faster than the rules that govern them, this committee examines how the international community can close gaps in arms control, protect civilians and prevent further escalation.",
-    studyGuideHref: "/docs/committees/disec-study-guide.pdf",
+    studyGuideHref: "https://drive.google.com/file/d/1-nk1reswT8sYAXhlKnbRKRn1qS5Cs-hM/view?usp=drivesdk",
     suitedTo:
       "Delegates who prefer structured, evidence-based argument on peace, security and disarmament.",
   },
@@ -33,7 +33,7 @@ export const COMMITTEE_DETAILS = [
     agenda: "The Question of Consent: Addressing Forced Marriages and Women's Autonomy in Pakistan",
     agendaDescription:
       "Evaluating legal protections, societal attitudes, and institutional shortcomings concerning forced marriages, consent, and women's right to make personal decisions.",
-    studyGuideHref: null,
+    studyGuideHref: "https://drive.google.com/file/d/15gIAyXxwL8odgbEpE6_P2TZYMuCDvL1W/view?usp=drivesdk",
     suitedTo:
       "Delegates interested in women's rights, legal protections and social change in Pakistan.",
   },
@@ -46,7 +46,7 @@ export const COMMITTEE_DETAILS = [
     agenda: "Eliminating Discriminatory Practices Against Women Worldwide",
     agendaDescription:
       "From female genital mutilation in parts of Africa to rigid workplace hierarchies and systemic exclusion in South Korea, discrimination against women takes many forms across the world. Child marriage in South Asia, so-called honour killings and Afghanistan's ban on girls' secondary and higher education show how tradition, law and institutions can deny women their safety, autonomy and opportunity. This committee examines why these practices persist and how the international community can dismantle them while respecting cultural contexts and ensuring lasting change.",
-    studyGuideHref: "/docs/committees/unwomen-study-guide.pdf",
+    studyGuideHref: "https://drive.google.com/file/d/1jUKcGeJPfLj9qnGiP-xlvDFc_FCdJF4x/view?usp=drivesdk",
     suitedTo: "Delegates who wish to argue from evidence and conviction on gender equality.",
   },
   {
@@ -58,7 +58,7 @@ export const COMMITTEE_DETAILS = [
     agenda: "Reassessing Pakistan's National Security and Foreign Policy to Strengthen Regional Stability",
     agendaDescription:
       "Pakistan's security is shaped by every one of its borders: the Line of Control and enduring tensions with India to the east, the Durand Line and cross-border clashes with Afghanistan and the TTP threat to the west, the Iranian frontier and BLA insurgency in Balochistan to the southwest, and its strategic partnership with China to the north. This committee examines border management, counterterrorism and regional diplomacy, and asks how Pakistan can safeguard its sovereignty while promoting lasting stability.",
-    studyGuideHref: "/docs/committees/pna-study-guide.pdf",
+    studyGuideHref: "https://drive.google.com/file/d/1z-CLTSpmJguJvJy2VZpyZjQYQr9rwel6/view?usp=drivesdk",
     suitedTo: "Delegates interested in domestic policy and parliamentary debate.",
   },
 ] as const;
