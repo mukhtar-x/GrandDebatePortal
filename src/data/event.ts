@@ -13,7 +13,7 @@ export const EVENT_DETAILS = {
  * add the PDFs under public/docs (paths in committee-details.ts and RULEBOOK_PATH) and set
  * the matching switch to true.
  */
-export const STUDY_GUIDES_PUBLISHED = false;
+export const STUDY_GUIDES_PUBLISHED = true;
 export const RULEBOOK_PUBLISHED = false;
 export const RULEBOOK_PATH = "/docs/event-rulebook.pdf";
 
