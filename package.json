@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "email:smoke": "node --env-file=.env.local --import tsx scripts/email-smoke-test.ts",
+    "email:communities": "node --env-file=.env.local --import tsx scripts/community-whatsapp-email.ts",
     "admin:hash": "tsx scripts/hash-admin-password.ts",
     "build": "next build",
     "start": "next start",

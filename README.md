@@ -181,7 +181,7 @@ available at `GET /api/admin/audit`.
 
 The public fee schedule in the current project is PKR 2,000 per delegate for the early-bird
 window (through 12 November 2026) and PKR 2,400 for the regular window (13–18 November 2026).
-Registration closes from 19 November 2026. Check `src/lib/pricing.ts` and `src/data/event.ts`
+Registration closes from 18 November 2026. Check `src/lib/pricing.ts` and `src/data/event.ts`
 before changing or announcing these values.
 
 ## Environment variables

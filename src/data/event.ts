@@ -22,7 +22,7 @@ export const MAX_DELEGATION_SIZE = 7;
 
 // Registration cutoffs use Pakistan time and are shared by pricing and the UI.
 export const EARLY_BIRD_ENDS_AT = "2026-11-13T00:00:00+05:00";
-export const REGISTRATION_ENDS_AT = "2026-11-19T00:00:00+05:00";
+export const REGISTRATION_ENDS_AT = "2026-11-18T00:00:00+05:00";
 
 export const COMMITTEES = [
   { code: "UNSC", name: "United Nations Security Council" },

@@ -34,6 +34,7 @@ yarn-error.log*
 .env*
 !.env.example
 tgd_mailer_secret.json
+/community-whatsapp-recipients.csv
 
 # vercel
 .vercel
