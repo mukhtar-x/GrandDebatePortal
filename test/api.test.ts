@@ -50,8 +50,8 @@ await test("pricing: delegations pay a single PKR 500 delegation fee", () => {
     assertPricing("2026-11-05T12:00:00.000+05:00", 7, 7 * 2000 + 500, "Early bird");
     assertPricing("2026-11-05T12:00:00.000+05:00", 1, 2000, "Early bird");
 });
-await test("pricing: registration closes 18 November (PKT)", () => {
-    const result = calculatePricing(1, new Date("2026-11-18T00:00:00.000+05:00"));
+await test("pricing: registration closes 19 November (PKT)", () => {
+    const result = calculatePricing(1, new Date("2026-11-19T00:00:00.000+05:00"));
     assert.equal(result.success, false);
     if (!result.success) assert.equal(result.code, "REGISTRATION_CLOSED");
 });
